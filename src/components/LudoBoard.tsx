@@ -13,8 +13,9 @@ import {
   TRACK_GRID_COORDS,
   HOME_COLUMN_GRID_COORDS,
   getTokenBoardPercent,
+  TOKEN_DIAMETER_PCT,
 } from '../lib/boardCoordinates.js';
-import { Star, Trophy, Crown, ArrowDown, ArrowUp, ArrowRight, ArrowLeft } from 'lucide-react';
+import { Star, Trophy, Crown, ArrowDown, ArrowUp, ArrowRight, ArrowLeft, Rocket } from 'lucide-react';
 
 interface LudoBoardProps {
   gameState: GameState;
@@ -39,7 +40,6 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
     const colorTokens = tokens[c] || [];
     colorTokens.forEach((t) => {
       const isMovable = c === currentTurn && movableTokenIds.includes(t.id);
-      // If animated override applies to this token, use its animated step
       const step = (animatedTokenOverride && animatedTokenOverride.color === c && animatedTokenOverride.tokenId === t.id)
         ? animatedTokenOverride.stepCount
         : t.stepCount;
@@ -63,7 +63,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
 
   // Calculate destination preview for hovered or single movable token
   const previewTokenId = hoveredTokenId !== null ? hoveredTokenId : (movableTokenIds.length === 1 ? movableTokenIds[0] : null);
-  let previewTargetCoord: { left: number; top: number } | null = null;
+  let previewTargetCoord: { left: number; top: number; centerX: number; centerY: number } | null = null;
   if (previewTokenId !== null && diceValue !== null && isCurrentPlayerTurn) {
     const pToken = tokens[currentTurn].find((t) => t.id === previewTokenId);
     if (pToken) {
@@ -82,7 +82,6 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
 
   const handleBaseClick = (color: PlayerColor) => {
     if (color !== currentTurn || !isCurrentPlayerTurn || !baseTokensMovable) return;
-    // Find first movable base token
     const baseToken = tokens[currentTurn].find((t) => t.state === 'base' && movableTokenIds.includes(t.id));
     if (baseToken) {
       onTokenClick(baseToken.id);
@@ -101,7 +100,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         <div
           onClick={() => handleBaseClick('green')}
           className={`col-start-1 col-end-7 row-start-1 row-end-7 p-2 bg-gradient-to-br from-emerald-600 to-emerald-800 border-r-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'green' && baseTokensMovable ? 'cursor-pointer ring-4 ring-emerald-300 animate-pulse' : ''
+            currentTurn === 'green' && baseTokensMovable ? 'cursor-pointer ring-4 ring-emerald-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
@@ -112,32 +111,32 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
             <Crown className="w-3.5 h-3.5 text-emerald-200" />
           </div>
 
-          {/* Inner 4-token Base Pit (Centered in 4x4) */}
-          <div className="absolute inset-0 m-auto w-[66.6%] h-[66.6%] rounded-2xl bg-white/95 p-1.5 shadow-inner border border-emerald-900/30">
-            <div className="relative w-full h-full">
-              {[
-                { top: '25%', left: '25%' },
-                { top: '25%', left: '75%' },
-                { top: '75%', left: '25%' },
-                { top: '75%', left: '75%' },
-              ].map((pos, idx) => (
-                <div
-                  key={idx}
-                  style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -50%)' }}
-                  className="absolute w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-emerald-600/20 border-2 border-emerald-600 flex items-center justify-center shadow-inner"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-600/40" />
-                </div>
-              ))}
-            </div>
+          {/* White Box containing the 4 circular pits */}
+          <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-white shadow-md border-2 border-emerald-800/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
+            {[0, 1, 2, 3].map((idx) => (
+              <div
+                key={idx}
+                className="w-full h-full rounded-full bg-emerald-100 border-2 border-emerald-500/80 flex items-center justify-center shadow-inner"
+              >
+                <div className="w-3 h-3 rounded-full bg-emerald-500/30" />
+              </div>
+            ))}
           </div>
+
+          {currentTurn === 'green' && baseTokensMovable && (
+            <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
+                <Rocket className="w-2.5 h-2.5" /> DEPLOY
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Top-Right: Yellow Base (Rows 0-5, Cols 10-15) */}
         <div
           onClick={() => handleBaseClick('yellow')}
           className={`col-start-10 col-end-16 row-start-1 row-end-7 p-2 bg-gradient-to-br from-amber-500 to-amber-700 border-l-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'yellow' && baseTokensMovable ? 'cursor-pointer ring-4 ring-amber-300 animate-pulse' : ''
+            currentTurn === 'yellow' && baseTokensMovable ? 'cursor-pointer ring-4 ring-amber-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
@@ -148,31 +147,31 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
             <Crown className="w-3.5 h-3.5 text-amber-200" />
           </div>
 
-          <div className="absolute inset-0 m-auto w-[66.6%] h-[66.6%] rounded-2xl bg-white/95 p-1.5 shadow-inner border border-amber-900/30">
-            <div className="relative w-full h-full">
-              {[
-                { top: '25%', left: '25%' },
-                { top: '25%', left: '75%' },
-                { top: '75%', left: '25%' },
-                { top: '75%', left: '75%' },
-              ].map((pos, idx) => (
-                <div
-                  key={idx}
-                  style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -50%)' }}
-                  className="absolute w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-amber-500/20 border-2 border-amber-500 flex items-center justify-center shadow-inner"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-amber-500/40" />
-                </div>
-              ))}
-            </div>
+          <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-white shadow-md border-2 border-amber-800/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
+            {[0, 1, 2, 3].map((idx) => (
+              <div
+                key={idx}
+                className="w-full h-full rounded-full bg-amber-100 border-2 border-amber-500/80 flex items-center justify-center shadow-inner"
+              >
+                <div className="w-3 h-3 rounded-full bg-amber-500/30" />
+              </div>
+            ))}
           </div>
+
+          {currentTurn === 'yellow' && baseTokensMovable && (
+            <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
+              <span className="px-2 py-0.5 rounded-full bg-amber-300 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
+                <Rocket className="w-2.5 h-2.5" /> DEPLOY
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Bottom-Left: Red Base (Rows 10-15, Cols 0-5) */}
         <div
           onClick={() => handleBaseClick('red')}
           className={`col-start-1 col-end-7 row-start-10 row-end-16 p-2 bg-gradient-to-br from-rose-600 to-rose-800 border-r-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'red' && baseTokensMovable ? 'cursor-pointer ring-4 ring-rose-300 animate-pulse' : ''
+            currentTurn === 'red' && baseTokensMovable ? 'cursor-pointer ring-4 ring-rose-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
@@ -183,31 +182,31 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
             <Crown className="w-3.5 h-3.5 text-rose-200" />
           </div>
 
-          <div className="absolute inset-0 m-auto w-[66.6%] h-[66.6%] rounded-2xl bg-white/95 p-1.5 shadow-inner border border-rose-900/30">
-            <div className="relative w-full h-full">
-              {[
-                { top: '25%', left: '25%' },
-                { top: '25%', left: '75%' },
-                { top: '75%', left: '25%' },
-                { top: '75%', left: '75%' },
-              ].map((pos, idx) => (
-                <div
-                  key={idx}
-                  style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -50%)' }}
-                  className="absolute w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-rose-600/20 border-2 border-rose-600 flex items-center justify-center shadow-inner"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-rose-600/40" />
-                </div>
-              ))}
-            </div>
+          <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-white shadow-md border-2 border-rose-800/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
+            {[0, 1, 2, 3].map((idx) => (
+              <div
+                key={idx}
+                className="w-full h-full rounded-full bg-rose-100 border-2 border-rose-500/80 flex items-center justify-center shadow-inner"
+              >
+                <div className="w-3 h-3 rounded-full bg-rose-500/30" />
+              </div>
+            ))}
           </div>
+
+          {currentTurn === 'red' && baseTokensMovable && (
+            <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
+              <span className="px-2.5 py-0.5 rounded-full bg-rose-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
+                <Rocket className="w-2.5 h-2.5" /> DEPLOY
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Bottom-Right: Blue Base (Rows 10-15, Cols 10-15) */}
         <div
           onClick={() => handleBaseClick('blue')}
           className={`col-start-10 col-end-16 row-start-10 row-end-16 p-2 bg-gradient-to-br from-blue-600 to-blue-800 border-l-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'blue' && baseTokensMovable ? 'cursor-pointer ring-4 ring-blue-300 animate-pulse' : ''
+            currentTurn === 'blue' && baseTokensMovable ? 'cursor-pointer ring-4 ring-blue-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
@@ -218,24 +217,24 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
             <Crown className="w-3.5 h-3.5 text-blue-200" />
           </div>
 
-          <div className="absolute inset-0 m-auto w-[66.6%] h-[66.6%] rounded-2xl bg-white/95 p-1.5 shadow-inner border border-blue-900/30">
-            <div className="relative w-full h-full">
-              {[
-                { top: '25%', left: '25%' },
-                { top: '25%', left: '75%' },
-                { top: '75%', left: '25%' },
-                { top: '75%', left: '75%' },
-              ].map((pos, idx) => (
-                <div
-                  key={idx}
-                  style={{ top: pos.top, left: pos.left, transform: 'translate(-50%, -50%)' }}
-                  className="absolute w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-blue-600/20 border-2 border-blue-600 flex items-center justify-center shadow-inner"
-                >
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-600/40" />
-                </div>
-              ))}
-            </div>
+          <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-white shadow-md border-2 border-blue-800/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
+            {[0, 1, 2, 3].map((idx) => (
+              <div
+                key={idx}
+                className="w-full h-full rounded-full bg-blue-100 border-2 border-blue-500/80 flex items-center justify-center shadow-inner"
+              >
+                <div className="w-3 h-3 rounded-full bg-blue-500/30" />
+              </div>
+            ))}
           </div>
+
+          {currentTurn === 'blue' && baseTokensMovable && (
+            <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
+              <span className="px-2 py-0.5 rounded-full bg-blue-300 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
+                <Rocket className="w-2.5 h-2.5" /> DEPLOY
+              </span>
+            </div>
+          )}
         </div>
 
         {/* ================= 52 COMMON TRACK CELLS ================= */}
@@ -272,7 +271,6 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
               }}
               className={`relative border ${borderHighlight} ${cellBg} flex items-center justify-center transition-colors shadow-sm`}
             >
-              {/* Star on safe spots */}
               {isSafe && (
                 <Star
                   className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${
@@ -287,7 +285,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         })}
 
         {/* ================= 4 HOME LANES ================= */}
-        {/* Red Home Column (row 7, cols 1-5) */}
+        {/* Red Home Column */}
         {HOME_COLUMN_GRID_COORDS.red.map((coord, idx) => (
           <div
             key={`red-home-col-${idx}`}
@@ -305,7 +303,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
           </div>
         ))}
 
-        {/* Blue Home Column (col 7, rows 9-13) */}
+        {/* Blue Home Column */}
         {HOME_COLUMN_GRID_COORDS.blue.map((coord, idx) => (
           <div
             key={`blue-home-col-${idx}`}
@@ -323,7 +321,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
           </div>
         ))}
 
-        {/* Yellow Home Column (row 7, cols 9-13) */}
+        {/* Yellow Home Column */}
         {HOME_COLUMN_GRID_COORDS.yellow.map((coord, idx) => (
           <div
             key={`yellow-home-col-${idx}`}
@@ -341,7 +339,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
           </div>
         ))}
 
-        {/* Green Home Column (col 7, rows 1-5) */}
+        {/* Green Home Column */}
         {HOME_COLUMN_GRID_COORDS.green.map((coord, idx) => (
           <div
             key={`green-home-col-${idx}`}
@@ -391,9 +389,10 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
           style={{
             left: `${previewTargetCoord.left}%`,
             top: `${previewTargetCoord.top}%`,
-            transform: 'translate(-50%, -50%)',
+            width: `${TOKEN_DIAMETER_PCT}%`,
+            height: `${TOKEN_DIAMETER_PCT}%`,
           }}
-          className="absolute w-[6.8%] aspect-square rounded-full border-3 border-amber-400 bg-amber-400/30 animate-ping pointer-events-none z-15"
+          className="absolute rounded-full border-3 border-amber-400 bg-amber-400/30 animate-ping pointer-events-none z-15"
         />
       )}
 
@@ -414,66 +413,69 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
               const colorTheme = COLOR_HEX[token.color] || COLOR_HEX.red;
 
               return (
-                <motion.div
+                <motion.button
                   key={`${token.color}-${token.id}`}
+                  type="button"
                   initial={false}
                   animate={{
                     left: `${coords.left}%`,
                     top: `${coords.top}%`,
-                    scale: isMovable ? [1, 1.15, 1] : 1,
-                    y: isMovable ? [0, -7, 0] : 0,
                   }}
                   transition={{
-                    left: { type: 'spring', stiffness: 350, damping: 26 },
-                    top: { type: 'spring', stiffness: 350, damping: 26 },
-                    scale: { repeat: isMovable ? Infinity : 0, duration: 1.1, ease: 'easeInOut' },
-                    y: { repeat: isMovable ? Infinity : 0, duration: 1.1, ease: 'easeInOut' },
+                    left: { type: 'spring', stiffness: 400, damping: 28 },
+                    top: { type: 'spring', stiffness: 400, damping: 28 },
                   }}
                   style={{
-                    transform: 'translate(-50%, -50%)',
+                    width: `${TOKEN_DIAMETER_PCT}%`,
+                    height: `${TOKEN_DIAMETER_PCT}%`,
                   }}
                   onMouseEnter={() => setHoveredTokenId(token.id)}
                   onMouseLeave={() => setHoveredTokenId(null)}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     if (isMovable && isCurrentPlayerTurn) {
                       onTokenClick(token.id);
                     }
                   }}
-                  className={`absolute w-[6.4%] aspect-square flex items-center justify-center z-25 ${
-                    isMovable && isCurrentPlayerTurn ? 'pointer-events-auto cursor-pointer' : ''
+                  onTouchEnd={(e) => {
+                    e.stopPropagation();
+                    if (isMovable && isCurrentPlayerTurn) {
+                      onTokenClick(token.id);
+                    }
+                  }}
+                  className={`absolute rounded-full flex items-center justify-center z-30 transition-all ${
+                    isMovable && isCurrentPlayerTurn
+                      ? 'pointer-events-auto cursor-pointer ring-4 ring-amber-300 ring-offset-2 ring-offset-slate-900 shadow-xl shadow-amber-400/70'
+                      : 'pointer-events-none'
                   }`}
+                  title={`${token.color.toUpperCase()} Token ${token.id + 1}${isMovable ? ' (Click to move)' : ''}`}
                 >
-                  {/* Expanded Tap Hitbox for mobile fingers (42px hitbox) */}
-                  <div className="absolute -inset-2.5 sm:-inset-3 z-30 pointer-events-auto" />
-
-                  {/* 3D Glossy Styled Token */}
+                  {/* 3D Glossy Token Face */}
                   <div
-                    className={`relative w-full h-full rounded-full flex items-center justify-center shadow-xl transition-all ${
-                      isMovable
-                        ? 'ring-4 ring-amber-300 ring-offset-1 ring-offset-slate-900 shadow-amber-400/60 scale-105'
-                        : 'shadow-black/80'
+                    className={`relative w-full h-full rounded-full flex items-center justify-center shadow-lg transition-transform ${
+                      isMovable ? 'scale-105' : ''
                     }`}
                     style={{
-                      background: `radial-gradient(circle at 35% 30%, ${colorTheme.light}, ${colorTheme.primary} 60%, ${colorTheme.dark} 100%)`,
-                      border: `1.5px solid ${colorTheme.light}`,
+                      background: `radial-gradient(circle at 35% 30%, ${colorTheme.light}, ${colorTheme.primary} 65%, ${colorTheme.dark} 100%)`,
+                      border: `2px solid ${colorTheme.light}`,
                     }}
                   >
-                    {/* Inner Cap with number */}
-                    <div className="w-[55%] h-[55%] rounded-full bg-white/25 border border-white/60 flex items-center justify-center shadow-inner">
-                      <span className="text-[8px] sm:text-[10px] font-black text-white drop-shadow">
+                    {/* Inner Cap with token number */}
+                    <div className="w-[58%] h-[58%] rounded-full bg-white/30 border border-white/70 flex items-center justify-center shadow-inner">
+                      <span className="text-[9px] sm:text-[11px] font-black text-white drop-shadow">
                         {token.id + 1}
                       </span>
                     </div>
 
-                    {/* Movable Pulsing Halo */}
-                    {isMovable && (
+                    {/* Movable Pulsing Ring */}
+                    {isMovable && isCurrentPlayerTurn && (
                       <span
-                        className="absolute -inset-1.5 rounded-full opacity-75 animate-ping pointer-events-none"
+                        className="absolute -inset-1 rounded-full opacity-80 animate-ping pointer-events-none"
                         style={{ backgroundColor: colorTheme.light }}
                       />
                     )}
                   </div>
-                </motion.div>
+                </motion.button>
               );
             });
           })}

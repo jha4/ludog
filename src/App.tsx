@@ -239,19 +239,26 @@ export default function App() {
 
       const dice = gameState.diceValue;
 
-      // Case 1: Deploy from base
+      // Case 1: Deploy from base onto start tile
       if (targetToken.state === 'base') {
         sounds.playSpawn();
-        const nextState = moveToken(gameState, tokenId);
-        setGameState(nextState);
+        setIsHopping(true);
+        setAnimatedTokenStep({ color, tokenId, stepCount: 0 });
 
-        if (gameState.mode === 'online_room') {
-          fetch(`/api/rooms/${gameState.id}/move`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ tokenId }),
-          }).catch(() => {});
-        }
+        setTimeout(() => {
+          setAnimatedTokenStep(null);
+          setIsHopping(false);
+          const nextState = moveToken(gameState, tokenId);
+          setGameState(nextState);
+
+          if (gameState.mode === 'online_room') {
+            fetch(`/api/rooms/${gameState.id}/move`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ tokenId }),
+            }).catch(() => {});
+          }
+        }, 260);
         return;
       }
 
@@ -409,12 +416,20 @@ export default function App() {
   const redPlayer = gameState.players.find((p) => p.color === 'red');
   const bluePlayer = gameState.players.find((p) => p.color === 'blue');
 
-  // One-click dice tap when exactly 1 move is available
+  // One-click dice tap: rolls if not rolled, or deploys/advances if legal move is available
   const handleDiceOrAutoMove = () => {
     if (!gameState.hasRolled) {
       handleRollDice();
-    } else if (gameState.movableTokenIds.length === 1 && !isHopping) {
-      executeMoveToken(gameState.movableTokenIds[0]);
+    } else if (gameState.movableTokenIds.length > 0 && !isHopping) {
+      // If exactly 1 movable token, or all movable tokens are in base, move first legal token
+      const allInBase = gameState.movableTokenIds.every((id) => {
+        const t = gameState.tokens[gameState.currentTurn].find((tok) => tok.id === id);
+        return t && t.state === 'base';
+      });
+
+      if (gameState.movableTokenIds.length === 1 || allInBase) {
+        executeMoveToken(gameState.movableTokenIds[0]);
+      }
     }
   };
 
@@ -566,7 +581,7 @@ export default function App() {
               isCurrentTurn={gameState.currentTurn === 'green'}
               diceValue={gameState.diceValue}
               isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'green' && (!gameState.hasRolled || gameState.movableTokenIds.length === 1)}
+              canRoll={gameState.currentTurn === 'green' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
               onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.green}
               position="top-left"
@@ -581,7 +596,7 @@ export default function App() {
               isCurrentTurn={gameState.currentTurn === 'yellow'}
               diceValue={gameState.diceValue}
               isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'yellow' && (!gameState.hasRolled || gameState.movableTokenIds.length === 1)}
+              canRoll={gameState.currentTurn === 'yellow' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
               onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.yellow}
               position="top-right"
@@ -609,7 +624,7 @@ export default function App() {
               isCurrentTurn={gameState.currentTurn === 'red'}
               diceValue={gameState.diceValue}
               isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'red' && (!gameState.hasRolled || gameState.movableTokenIds.length === 1)}
+              canRoll={gameState.currentTurn === 'red' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
               onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.red}
               position="bottom-left"
@@ -624,7 +639,7 @@ export default function App() {
               isCurrentTurn={gameState.currentTurn === 'blue'}
               diceValue={gameState.diceValue}
               isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'blue' && (!gameState.hasRolled || gameState.movableTokenIds.length === 1)}
+              canRoll={gameState.currentTurn === 'blue' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
               onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.blue}
               position="bottom-right"

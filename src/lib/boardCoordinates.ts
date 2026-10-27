@@ -7,6 +7,8 @@ export interface GridCoord {
 
 /**
  * Standard 52 Track cells mapped to 15x15 board coordinates [row, col]
+ * Clockwise path around the 15x15 board:
+ * Red: Bottom-Left (exit Row 8, Col 1 -> move along track)
  */
 export const TRACK_GRID_COORDS: GridCoord[] = [
   { row: 8, col: 1 },  // 0  (Red Start, Safe)
@@ -108,40 +110,48 @@ export const HOME_FINISH_GRID_COORDS: Record<PlayerColor, GridCoord> = {
 };
 
 /**
- * 4 Slot coordinates inside each player's 6x6 base
- * Centered in the 4x4 inner box:
- * Slots are at [1.5, 1.5], [1.5, 3.5], [3.5, 1.5], [3.5, 3.5]
+ * Exact slot coordinates for the 4 tokens inside each player's 6x6 base.
+ * In a 15x15 board, cell coordinates represent the exact center of each pit:
+ * Green (top-left, 0-5): cols 1.75, 4.25; rows 1.75, 4.25
+ * Yellow (top-right, cols 9-14, rows 0-5): cols 10.75, 13.25; rows 1.75, 4.25
+ * Red (bottom-left, cols 0-5, rows 9-14): cols 1.75, 4.25; rows 10.75, 13.25
+ * Blue (bottom-right, cols 9-14, rows 9-14): cols 10.75, 13.25; rows 10.75, 13.25
  */
 export const BASE_SLOT_GRID_COORDS: Record<PlayerColor, GridCoord[]> = {
   green: [
-    { row: 1.5, col: 1.5 },
-    { row: 1.5, col: 3.5 },
-    { row: 3.5, col: 1.5 },
-    { row: 3.5, col: 3.5 },
+    { row: 2.0, col: 2.0 },
+    { row: 2.0, col: 4.0 },
+    { row: 4.0, col: 2.0 },
+    { row: 4.0, col: 4.0 },
   ],
   yellow: [
-    { row: 1.5, col: 10.5 },
-    { row: 1.5, col: 12.5 },
-    { row: 3.5, col: 10.5 },
-    { row: 3.5, col: 12.5 },
+    { row: 2.0, col: 11.0 },
+    { row: 2.0, col: 13.0 },
+    { row: 4.0, col: 11.0 },
+    { row: 4.0, col: 13.0 },
   ],
   red: [
-    { row: 10.5, col: 1.5 },
-    { row: 10.5, col: 3.5 },
-    { row: 12.5, col: 1.5 },
-    { row: 12.5, col: 3.5 },
+    { row: 11.0, col: 2.0 },
+    { row: 11.0, col: 4.0 },
+    { row: 13.0, col: 2.0 },
+    { row: 13.0, col: 4.0 },
   ],
   blue: [
-    { row: 10.5, col: 10.5 },
-    { row: 10.5, col: 12.5 },
-    { row: 12.5, col: 10.5 },
-    { row: 12.5, col: 12.5 },
+    { row: 11.0, col: 11.0 },
+    { row: 11.0, col: 13.0 },
+    { row: 13.0, col: 11.0 },
+    { row: 13.0, col: 13.0 },
   ],
 };
 
 /**
- * Convert any token state & stepCount into exact percentage coordinates [left%, top%] on the 15x15 board
- * Supports stacking offsets when multiple tokens share the same tile!
+ * Token visual diameter in percentage of board width
+ */
+export const TOKEN_DIAMETER_PCT = 6.4;
+
+/**
+ * Convert any token state & stepCount into exact percentage coordinates [left%, top%] on the 15x15 board.
+ * Returns the exact top-left percentage of the token so it is perfectly centered on the target cell!
  */
 export function getTokenBoardPercent(
   color: PlayerColor,
@@ -149,10 +159,28 @@ export function getTokenBoardPercent(
   stepCount: number,
   stackIndex: number = 0,
   stackTotal: number = 1
-): { left: number; top: number } {
-  const CELL_SIZE_PCT = 100 / 15; // 6.6666%
+): { left: number; top: number; centerX: number; centerY: number } {
+  const CELL_SIZE_PCT = 100 / 15; // 6.66667%
+  const HALF_TOKEN = TOKEN_DIAMETER_PCT / 2; // 3.2%
 
-  // Compute slight offset if multiple tokens share the exact same cell
+  let cellCenterX = 50;
+  let cellCenterY = 50;
+
+  if (stepCount < 0) {
+    // Inside Base: coordinates are exact pit centers
+    const slot = BASE_SLOT_GRID_COORDS[color][tokenId] || BASE_SLOT_GRID_COORDS[color][0];
+    cellCenterX = (slot.col - 0.5) * CELL_SIZE_PCT;
+    cellCenterY = (slot.row - 0.5) * CELL_SIZE_PCT;
+
+    return {
+      left: cellCenterX - HALF_TOKEN,
+      top: cellCenterY - HALF_TOKEN,
+      centerX: cellCenterX,
+      centerY: cellCenterY,
+    };
+  }
+
+  // Offset if multiple tokens share the same track/home cell
   let offsetX = 0;
   let offsetY = 0;
   if (stackTotal > 1) {
@@ -161,33 +189,29 @@ export function getTokenBoardPercent(
       offsetY = stackIndex === 0 ? -0.8 : 0.8;
     } else {
       const angle = (stackIndex / stackTotal) * 2 * Math.PI;
-      offsetX = Math.cos(angle) * 1.0;
-      offsetY = Math.sin(angle) * 1.0;
+      offsetX = Math.cos(angle) * 1.1;
+      offsetY = Math.sin(angle) * 1.1;
     }
   }
 
-  if (stepCount < 0) {
-    // In Base
-    const slot = BASE_SLOT_GRID_COORDS[color][tokenId] || BASE_SLOT_GRID_COORDS[color][0];
-    return {
-      left: (slot.col + 0.5) * CELL_SIZE_PCT,
-      top: (slot.row + 0.5) * CELL_SIZE_PCT,
-    };
-  }
-
   if (stepCount >= 56) {
-    // In Home Finish
+    // In Home Finish Triangle
     const finish = HOME_FINISH_GRID_COORDS[color];
-    const offsets = [
-      { dx: -0.22, dy: -0.22 },
-      { dx: 0.22, dy: -0.22 },
-      { dx: -0.22, dy: 0.22 },
-      { dx: 0.22, dy: 0.22 },
+    const finishOffsets = [
+      { dx: -0.25, dy: -0.25 },
+      { dx: 0.25, dy: -0.25 },
+      { dx: -0.25, dy: 0.25 },
+      { dx: 0.25, dy: 0.25 },
     ];
-    const off = offsets[tokenId % 4];
+    const off = finishOffsets[tokenId % 4];
+    cellCenterX = (finish.col + 0.5 + off.dx) * CELL_SIZE_PCT;
+    cellCenterY = (finish.row + 0.5 + off.dy) * CELL_SIZE_PCT;
+
     return {
-      left: (finish.col + 0.5 + off.dx) * CELL_SIZE_PCT,
-      top: (finish.row + 0.5 + off.dy) * CELL_SIZE_PCT,
+      left: cellCenterX - HALF_TOKEN,
+      top: cellCenterY - HALF_TOKEN,
+      centerX: cellCenterX,
+      centerY: cellCenterY,
     };
   }
 
@@ -195,20 +219,36 @@ export function getTokenBoardPercent(
     // In Home Column (steps 51 to 55 -> index 0 to 4)
     const homeColIndex = stepCount - 51;
     const coord = HOME_COLUMN_GRID_COORDS[color][homeColIndex];
+    cellCenterX = (coord.col + 0.5) * CELL_SIZE_PCT + offsetX;
+    cellCenterY = (coord.row + 0.5) * CELL_SIZE_PCT + offsetY;
+
     return {
-      left: (coord.col + 0.5) * CELL_SIZE_PCT + offsetX,
-      top: (coord.row + 0.5) * CELL_SIZE_PCT + offsetY,
+      left: cellCenterX - HALF_TOKEN,
+      top: cellCenterY - HALF_TOKEN,
+      centerX: cellCenterX,
+      centerY: cellCenterY,
     };
   }
 
   // On common track (steps 0 to 50)
   const trackPos = getTrackPosition(color, stepCount);
   if (trackPos === null) {
-    return { left: 50, top: 50 };
+    return {
+      left: 50 - HALF_TOKEN,
+      top: 50 - HALF_TOKEN,
+      centerX: 50,
+      centerY: 50,
+    };
   }
+
   const coord = TRACK_GRID_COORDS[trackPos];
+  cellCenterX = (coord.col + 0.5) * CELL_SIZE_PCT + offsetX;
+  cellCenterY = (coord.row + 0.5) * CELL_SIZE_PCT + offsetY;
+
   return {
-    left: (coord.col + 0.5) * CELL_SIZE_PCT + offsetX,
-    top: (coord.row + 0.5) * CELL_SIZE_PCT + offsetY,
+    left: cellCenterX - HALF_TOKEN,
+    top: cellCenterY - HALF_TOKEN,
+    centerX: cellCenterX,
+    centerY: cellCenterY,
   };
 }
