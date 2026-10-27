@@ -39,6 +39,7 @@ import {
   Smartphone,
   ChevronRight,
 } from 'lucide-react';
+import { Analytics } from '@vercel/analytics/react';
 
 export default function App() {
   // Game State
@@ -708,6 +709,7 @@ export default function App() {
         </div>
 
       </div>
+      <Analytics />
     </div>
   );
 }
