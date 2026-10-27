@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+@theme {
+  --font-fredoka: 'Fredoka', cursive, sans-serif;
+  --font-outfit: 'Outfit', sans-serif;
+}
+
+/* 15x15 Ludo Board Grid Support */
+.grid-cols-15 {
+  grid-template-columns: repeat(15, minmax(0, 1fr));
+}
+.grid-rows-15 {
+  grid-template-rows: repeat(15, minmax(0, 1fr));
+}
+
+.col-start-1 { grid-column-start: 1; }
+.col-end-7 { grid-column-end: 7; }
+.row-start-1 { grid-row-start: 1; }
+.row-end-7 { grid-row-end: 7; }
+
+.col-start-10 { grid-column-start: 10; }
+.col-end-16 { grid-column-end: 16; }
+.row-start-10 { grid-row-start: 10; }
+.row-end-16 { grid-row-end: 16; }
+
+.col-start-7 { grid-column-start: 7; }
+.col-end-10 { grid-column-end: 10; }
+.row-start-7 { grid-row-start: 7; }
+.row-end-10 { grid-row-end: 10; }
+
+/* Custom utility for hiding scrollbars on quick emoji tray */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

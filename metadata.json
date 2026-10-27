@@ -1,0 +1,6 @@
+{
+  "name": "Ludo Royal Mobile",
+  "description": "Mobile-style Ludo game with smart AI bots for single player, multiplayer rooms, animated emoji reactions, and interactive arcade sound effects.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
