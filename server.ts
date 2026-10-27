@@ -9,6 +9,8 @@ import {
   moveToken,
   selectBotMove,
   getCurrentPlayer,
+  addPlayerToOnlineRoom,
+  startOnlineRoomGame,
   EmojiEvent,
 } from './src/lib/ludoEngine.js';
 
@@ -192,8 +194,8 @@ app.get('/api/rooms', (req: Request, res: Response) => {
 app.post('/api/rooms', (req: Request, res: Response) => {
   const { mode = 'single_player', playerName = 'Player 1', playerColor = 'red', botCount = 3 } = req.body;
   const roomId = 'ROOM-' + Math.floor(1000 + Math.random() * 9000);
-
-  const initialGame = createNewGame(mode, playerName, playerColor, botCount, roomId);
+  const botsToSpawn = mode === 'online_room' ? 0 : botCount;
+  const initialGame = createNewGame(mode, playerName, playerColor, botsToSpawn, roomId);
 
   rooms.set(roomId, {
     state: initialGame,
@@ -202,7 +204,10 @@ app.post('/api/rooms', (req: Request, res: Response) => {
     botTimer: null,
   });
 
-  scheduleBotTurnIfNeeded(roomId);
+  if (initialGame.status === 'playing') {
+    scheduleBotTurnIfNeeded(roomId);
+  }
+
   res.status(201).json(initialGame);
 });
 
@@ -211,7 +216,7 @@ app.get('/api/rooms/:roomId', (req: Request, res: Response) => {
   const { roomId } = req.params;
   const room = rooms.get(roomId);
   if (!room) {
-    return res.status(404).json({ error: 'Room not found' });
+    return res.status(404).json({ error: 'Room not found. Please verify your room code.' });
   }
   res.json(room.state);
 });
@@ -220,42 +225,88 @@ app.get('/api/rooms/:roomId', (req: Request, res: Response) => {
 app.post('/api/rooms/:roomId/join', (req: Request, res: Response) => {
   const { roomId } = req.params;
   const { playerName = 'New Player', playerColor } = req.body;
+  const room = rooms.get(roomId);
 
-  let room = rooms.get(roomId);
   if (!room) {
-    // Auto-create room if joining by code
-    const newGame = createNewGame('online_room', playerName, playerColor || 'red', 3, roomId);
-    room = {
-      state: newGame,
-      clients: new Set(),
-      lastActive: Date.now(),
-      botTimer: null,
-    };
-    rooms.set(roomId, room);
-    scheduleBotTurnIfNeeded(roomId);
-    return res.json(newGame);
+    return res.status(404).json({ error: 'Room not found. Please verify the room code.' });
   }
 
-  // Find a slot or replace a bot slot with human
-  const botSlotIndex = room.state.players.findIndex((p) => p.type === 'bot');
-  if (botSlotIndex !== -1) {
-    const assignedColor = playerColor && !room.state.players.some((p) => p.color === playerColor && p.type === 'human')
-      ? playerColor
-      : room.state.players[botSlotIndex].color;
-
-    room.state.players[botSlotIndex] = {
-      id: 'player-' + Math.random().toString(36).substring(2, 8),
-      name: playerName,
-      color: assignedColor,
-      type: 'human',
-      avatar: '🤠',
-      isReady: true,
-    };
-
-    broadcastToRoom(roomId, { type: 'state_update', payload: room.state });
+  if (room.state.status === 'playing') {
+    return res.status(400).json({ error: 'Game in this room has already started.' });
   }
 
+  if (room.state.players.length >= 4) {
+    return res.status(400).json({ error: 'Room is full (maximum 4 players).' });
+  }
+
+  const joinResult = addPlayerToOnlineRoom(room.state, {
+    name: playerName,
+    color: playerColor,
+  });
+
+  if ('error' in joinResult) {
+    return res.status(400).json({ error: joinResult.error });
+  }
+
+  room.state = joinResult.state;
+  room.lastActive = Date.now();
+  broadcastToRoom(roomId, { type: 'state_update', payload: room.state });
+
+  res.json({
+    ...room.state,
+    assignedPlayerId: joinResult.player.id,
+    assignedColor: joinResult.player.color,
+  });
+});
+
+// Start Room Game (host starts when 2+ players)
+app.post('/api/rooms/:roomId/start', (req: Request, res: Response) => {
+  const { roomId } = req.params;
+  const room = rooms.get(roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found' });
+  }
+
+  const startResult = startOnlineRoomGame(room.state);
+  if ('error' in startResult) {
+    return res.status(400).json({ error: startResult.error });
+  }
+
+  room.state = startResult;
+  room.lastActive = Date.now();
+  broadcastToRoom(roomId, { type: 'state_update', payload: room.state });
   res.json(room.state);
+});
+
+// Leave Room
+app.post('/api/rooms/:roomId/leave', (req: Request, res: Response) => {
+  const { roomId } = req.params;
+  const { playerId } = req.body;
+  const room = rooms.get(roomId);
+
+  if (!room) {
+    return res.status(404).json({ error: 'Room not found' });
+  }
+
+  const remainingPlayers = room.state.players.filter((p) => p.id !== playerId);
+  if (remainingPlayers.length === 0) {
+    rooms.delete(roomId);
+    return res.json({ success: true, roomClosed: true });
+  }
+
+  room.state = {
+    ...room.state,
+    players: remainingPlayers,
+    status: remainingPlayers.length < 2 && room.state.status === 'playing' ? 'waiting' : room.state.status,
+    currentTurn: remainingPlayers.some((p) => p.color === room.state.currentTurn)
+      ? room.state.currentTurn
+      : remainingPlayers[0].color,
+    history: [`A player left the room.`, ...room.state.history.slice(0, 19)],
+  };
+  room.lastActive = Date.now();
+  broadcastToRoom(roomId, { type: 'state_update', payload: room.state });
+  res.json({ success: true, state: room.state });
 });
 
 // Roll Dice
@@ -345,15 +396,7 @@ app.get('/api/rooms/:roomId/stream', (req: Request, res: Response) => {
   let room = rooms.get(roomId);
 
   if (!room) {
-    const newGame = createNewGame('single_player', 'You', 'red', 3, roomId);
-    room = {
-      state: newGame,
-      clients: new Set(),
-      lastActive: Date.now(),
-      botTimer: null,
-    };
-    rooms.set(roomId, room);
-    scheduleBotTurnIfNeeded(roomId);
+    return res.status(404).json({ error: 'Room not found' });
   }
 
   res.writeHead(200, {

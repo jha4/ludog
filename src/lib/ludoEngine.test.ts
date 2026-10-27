@@ -7,6 +7,8 @@ import {
   getTrackPosition,
   isSafePosition,
   selectBotMove,
+  addPlayerToOnlineRoom,
+  startOnlineRoomGame,
 } from './ludoEngine.ts';
 
 test('creates a fresh single player game with 1 human and 3 bots', () => {
@@ -183,4 +185,96 @@ test('winning condition registers when all 4 tokens reach home', () => {
 
   assert.equal(game.winner, 'red');
   assert.equal(game.rankings.includes('red'), true);
+});
+
+test('pass_and_play creates exactly the configured human players and zero bots', () => {
+  const game = createNewGame('pass_and_play', 'Alice', 'red', 0, 'ROOM-1', {
+    playerCount: 3,
+    players: [
+      { name: 'P1 Red', color: 'red' },
+      { name: 'P2 Blue', color: 'blue' },
+      { name: 'P3 Yellow', color: 'yellow' },
+    ],
+  });
+
+  assert.equal(game.players.length, 3);
+  assert.equal(game.players.every((p) => p.type === 'human'), true);
+  assert.equal(game.players.some((p) => p.type === 'bot'), false);
+  assert.equal(game.players[0].name, 'P1 Red');
+  assert.equal(game.players[1].name, 'P2 Blue');
+  assert.equal(game.players[2].name, 'P3 Yellow');
+});
+
+test('online_room creates 1 human host, 0 bots, and status waiting', () => {
+  const game = createNewGame('online_room', 'HostPlayer', 'red', 0, 'ROOM-999');
+  assert.equal(game.players.length, 1);
+  assert.equal(game.players[0].type, 'human');
+  assert.equal(game.status, 'waiting');
+});
+
+test('addPlayerToOnlineRoom assigns available color and blocks 5th player', () => {
+  let game = createNewGame('online_room', 'Host', 'red', 0, 'ROOM-888');
+
+  // Add 2nd player
+  const res2 = addPlayerToOnlineRoom(game, { name: 'Player 2' });
+  assert.equal('error' in res2, false);
+  if (!('error' in res2)) {
+    game = res2.state;
+    assert.equal(res2.player.color, 'blue');
+    assert.equal(game.players.length, 2);
+  }
+
+  // Add 3rd player
+  const res3 = addPlayerToOnlineRoom(game, { name: 'Player 3' });
+  assert.equal('error' in res3, false);
+  if (!('error' in res3)) {
+    game = res3.state;
+    assert.equal(res3.player.color, 'yellow');
+    assert.equal(game.players.length, 3);
+  }
+
+  // Add 4th player
+  const res4 = addPlayerToOnlineRoom(game, { name: 'Player 4' });
+  assert.equal('error' in res4, false);
+  if (!('error' in res4)) {
+    game = res4.state;
+    assert.equal(res4.player.color, 'green');
+    assert.equal(game.players.length, 4);
+  }
+
+  // Try 5th player -> should error
+  const res5 = addPlayerToOnlineRoom(game, { name: 'Player 5' });
+  assert.equal('error' in res5, true);
+});
+
+test('startOnlineRoomGame requires at least 2 players', () => {
+  const soloRoom = createNewGame('online_room', 'Host', 'red', 0, 'ROOM-777');
+  const errStart = startOnlineRoomGame(soloRoom);
+  assert.equal('error' in errStart, true);
+
+  const joinRes = addPlayerToOnlineRoom(soloRoom, { name: 'Guest' });
+  assert.equal('error' in joinRes, false);
+  if (!('error' in joinRes)) {
+    const started = startOnlineRoomGame(joinRes.state);
+    assert.equal('error' in started, false);
+    if (!('error' in started)) {
+      assert.equal(started.status, 'playing');
+    }
+  }
+});
+
+test('three consecutive sixes penalizes and passes turn to next player', () => {
+  let game = createNewGame('single_player', 'Alice', 'red', 3);
+  // Deploy 1 token first so moves are possible
+  game = rollDice(game, 6);
+  game = moveToken(game, 0); // Red token 0 on track, consecutiveSixes = 1
+
+  // Second 6
+  game = rollDice(game, 6);
+  game = moveToken(game, 0); // consecutiveSixes = 2
+
+  // Third 6 -> turn penalty, passes turn to blue!
+  game = rollDice(game, 6);
+  assert.equal(game.consecutiveSixes, 0);
+  assert.equal(game.currentTurn, 'blue');
 });

@@ -138,6 +138,11 @@ export function createInitialTokens(color: PlayerColor): Token[] {
   }));
 }
 
+export interface PassAndPlayConfig {
+  playerCount: number; // 2, 3, or 4
+  players?: Array<{ name: string; color: PlayerColor; avatar?: string }>;
+}
+
 /**
  * Creates initial game state
  */
@@ -146,26 +151,26 @@ export function createNewGame(
   playerName: string = 'You',
   playerColor: PlayerColor = 'red',
   botCount: number = 3,
-  roomId: string = 'LUDO-' + Math.floor(1000 + Math.random() * 9000)
+  roomId: string = 'LUDO-' + Math.floor(1000 + Math.random() * 9000),
+  passAndPlayConfig?: PassAndPlayConfig
 ): GameState {
   const players: Player[] = [];
 
-  // Add human player
-  players.push({
-    id: 'player-1',
-    name: playerName,
-    color: playerColor,
-    type: 'human',
-    avatar: '😎',
-    isReady: true,
-  });
-
-  // Available colors for bots/other players
-  const otherColors = COLOR_ORDER.filter((c) => c !== playerColor);
-
   if (mode === 'single_player') {
-    // Add requested number of bots
-    for (let i = 0; i < Math.min(botCount, otherColors.length); i++) {
+    // Add human player
+    players.push({
+      id: 'player-1',
+      name: playerName.trim() || 'Player 1',
+      color: playerColor,
+      type: 'human',
+      avatar: '😎',
+      isReady: true,
+    });
+
+    // Add requested number of bots (1, 2, or 3)
+    const otherColors = COLOR_ORDER.filter((c) => c !== playerColor);
+    const count = Math.max(1, Math.min(3, botCount));
+    for (let i = 0; i < count; i++) {
       const botProfile = BOT_PROFILES[i % BOT_PROFILES.length];
       players.push({
         id: `bot-${i + 1}`,
@@ -178,44 +183,59 @@ export function createNewGame(
       });
     }
   } else if (mode === 'pass_and_play') {
-    // Pass and play with 4 local humans
-    const defaultNames: Record<PlayerColor, string> = {
-      red: 'Red Player',
-      green: 'Green Player',
-      yellow: 'Yellow Player',
-      blue: 'Blue Player',
-    };
+    // Pass and play with 2, 3, or 4 human players ONLY - NEVER ADD BOTS!
+    const count = Math.max(2, Math.min(4, passAndPlayConfig?.playerCount ?? 2));
     const defaultAvatars: Record<PlayerColor, string> = {
       red: '🦁',
-      green: '🐯',
-      yellow: '🦅',
       blue: '🐬',
+      yellow: '🦅',
+      green: '🐯',
     };
-    for (let i = 0; i < otherColors.length; i++) {
-      const c = otherColors[i];
+
+    if (passAndPlayConfig?.players && passAndPlayConfig.players.length >= count) {
+      passAndPlayConfig.players.slice(0, count).forEach((p, idx) => {
+        players.push({
+          id: `local-${idx + 1}`,
+          name: p.name.trim() || `Player ${idx + 1}`,
+          color: p.color,
+          type: 'human',
+          avatar: p.avatar || defaultAvatars[p.color] || '😎',
+          isReady: true,
+        });
+      });
+    } else {
       players.push({
-        id: `local-${i + 2}`,
-        name: defaultNames[c],
-        color: c,
+        id: 'local-1',
+        name: playerName.trim() || 'Player 1',
+        color: playerColor,
         type: 'human',
-        avatar: defaultAvatars[c],
+        avatar: defaultAvatars[playerColor] || '😎',
         isReady: true,
       });
+
+      const remainingColors = COLOR_ORDER.filter((c) => c !== playerColor);
+      for (let i = 1; i < count; i++) {
+        const c = remainingColors[i - 1];
+        players.push({
+          id: `local-${i + 1}`,
+          name: `Player ${i + 1}`,
+          color: c,
+          type: 'human',
+          avatar: defaultAvatars[c] || '🦁',
+          isReady: true,
+        });
+      }
     }
   } else {
-    // Online room: fill remaining seats with bots by default so room is playable immediately
-    for (let i = 0; i < Math.min(botCount, otherColors.length); i++) {
-      const botProfile = BOT_PROFILES[i % BOT_PROFILES.length];
-      players.push({
-        id: `bot-${i + 1}`,
-        name: botProfile.name,
-        color: otherColors[i],
-        type: 'bot',
-        avatar: botProfile.avatar,
-        isReady: true,
-        botDifficulty: botProfile.difficulty,
-      });
-    }
+    // Online room: 1 human player (Host) - NEVER ADD AUTOMATIC BOTS!
+    players.push({
+      id: 'host-1',
+      name: playerName.trim() || 'Host',
+      color: playerColor,
+      type: 'human',
+      avatar: '👑',
+      isReady: true,
+    });
   }
 
   // Ensure players are ordered by standard turn order
@@ -227,6 +247,8 @@ export function createNewGame(
     yellow: createInitialTokens('yellow'),
     blue: createInitialTokens('blue'),
   };
+
+  const initialStatus = mode === 'online_room' ? 'waiting' : 'playing';
 
   return {
     id: roomId,
@@ -240,11 +262,89 @@ export function createNewGame(
     isRolling: false,
     consecutiveSixes: 0,
     movableTokenIds: [],
-    status: 'playing',
+    status: initialStatus,
     winner: null,
     rankings: [],
     turnTimeRemaining: 20,
-    history: [`Game started with ${players.length} players. First turn: ${players[0].name} (${players[0].color.toUpperCase()})`],
+    history: [
+      mode === 'online_room'
+        ? `Room ${roomId} created. Waiting for friends to join...`
+        : `Game started with ${players.length} players. First turn: ${players[0].name} (${players[0].color.toUpperCase()})`,
+    ],
+  };
+}
+
+/**
+ * Add a new human player to an online room
+ */
+export function addPlayerToOnlineRoom(
+  state: GameState,
+  player: { name: string; color?: PlayerColor; avatar?: string }
+): { state: GameState; player: Player } | { error: string } {
+  if (state.mode !== 'online_room') {
+    return { error: 'Not an online room' };
+  }
+  if (state.players.length >= 4) {
+    return { error: 'Room is full (max 4 players)' };
+  }
+  if (state.status === 'playing') {
+    return { error: 'Game has already started in this room' };
+  }
+
+  const occupiedColors = new Set(state.players.map((p) => p.color));
+  let assignedColor: PlayerColor;
+  if (player.color && !occupiedColors.has(player.color)) {
+    assignedColor = player.color;
+  } else {
+    const available = COLOR_ORDER.find((c) => !occupiedColors.has(c));
+    if (!available) {
+      return { error: 'No available color seats in room' };
+    }
+    assignedColor = available;
+  }
+
+  const newPlayer: Player = {
+    id: 'player-' + Math.random().toString(36).substring(2, 9),
+    name: player.name.trim() || `Player ${state.players.length + 1}`,
+    color: assignedColor,
+    type: 'human',
+    avatar: player.avatar || (assignedColor === 'blue' ? '🐬' : assignedColor === 'yellow' ? '🦅' : assignedColor === 'green' ? '🐯' : '🦁'),
+    isReady: true,
+  };
+
+  const newPlayers = [...state.players, newPlayer];
+  newPlayers.sort((a, b) => COLOR_ORDER.indexOf(a.color) - COLOR_ORDER.indexOf(b.color));
+
+  return {
+    state: {
+      ...state,
+      players: newPlayers,
+      currentTurn: newPlayers[0].color,
+      history: [`${newPlayer.name} joined the room as ${assignedColor.toUpperCase()}!`, ...state.history.slice(0, 19)],
+    },
+    player: newPlayer,
+  };
+}
+
+/**
+ * Start an online room game once 2+ players are present
+ */
+export function startOnlineRoomGame(state: GameState): GameState | { error: string } {
+  if (state.mode !== 'online_room') {
+    return { error: 'Not an online room' };
+  }
+  if (state.players.length < 2) {
+    return { error: 'Need at least 2 players to start game' };
+  }
+  if (state.status === 'playing') {
+    return state;
+  }
+
+  return {
+    ...state,
+    status: 'playing',
+    currentTurn: state.players[0].color,
+    history: [`Game started with ${state.players.length} players! First turn: ${state.players[0].name} (${state.players[0].color.toUpperCase()})`, ...state.history.slice(0, 19)],
   };
 }
 

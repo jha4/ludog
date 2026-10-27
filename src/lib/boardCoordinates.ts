@@ -110,39 +110,43 @@ export const HOME_FINISH_GRID_COORDS: Record<PlayerColor, GridCoord> = {
 };
 
 /**
- * Exact slot coordinates for the 4 tokens inside each player's 6x6 base.
- * In a 15x15 board, cell coordinates represent the exact center of each pit:
- * Green (top-left, 0-5): cols 1.75, 4.25; rows 1.75, 4.25
- * Yellow (top-right, cols 9-14, rows 0-5): cols 10.75, 13.25; rows 1.75, 4.25
- * Red (bottom-left, cols 0-5, rows 9-14): cols 1.75, 4.25; rows 10.75, 13.25
- * Blue (bottom-right, cols 9-14, rows 9-14): cols 10.75, 13.25; rows 10.75, 13.25
+ * Exact percentage coordinates [centerX%, centerY%] for the 4 pits inside each player's 6x6 base.
+ * In a 15x15 board:
+ * Each quadrant is 40% x 40% (6 cols x 6 rows).
+ * Inside each quadrant, the white box is 68% of the quadrant width/height (27.2% of board) centered at:
+ * Green: (20%, 20%) -> Pit centers at X: 13.2%, 26.8% and Y: 13.2%, 26.8%
+ * Yellow: (80%, 20%) -> Pit centers at X: 73.2%, 86.8% and Y: 13.2%, 26.8%
+ * Red: (20%, 80%) -> Pit centers at X: 13.2%, 26.8% and Y: 73.2%, 86.8%
+ * Blue: (80%, 80%) -> Pit centers at X: 73.2%, 86.8% and Y: 73.2%, 86.8%
  */
-export const BASE_SLOT_GRID_COORDS: Record<PlayerColor, GridCoord[]> = {
+export const BASE_PIT_PERCENT_COORDS: Record<PlayerColor, Array<{ centerX: number; centerY: number }>> = {
   green: [
-    { row: 2.0, col: 2.0 },
-    { row: 2.0, col: 4.0 },
-    { row: 4.0, col: 2.0 },
-    { row: 4.0, col: 4.0 },
+    { centerX: 13.2, centerY: 13.2 },
+    { centerX: 26.8, centerY: 13.2 },
+    { centerX: 13.2, centerY: 26.8 },
+    { centerX: 26.8, centerY: 26.8 },
   ],
   yellow: [
-    { row: 2.0, col: 11.0 },
-    { row: 2.0, col: 13.0 },
-    { row: 4.0, col: 11.0 },
-    { row: 4.0, col: 13.0 },
+    { centerX: 73.2, centerY: 13.2 },
+    { centerX: 86.8, centerY: 13.2 },
+    { centerX: 73.2, centerY: 26.8 },
+    { centerX: 86.8, centerY: 26.8 },
   ],
   red: [
-    { row: 11.0, col: 2.0 },
-    { row: 11.0, col: 4.0 },
-    { row: 13.0, col: 2.0 },
-    { row: 13.0, col: 4.0 },
+    { centerX: 13.2, centerY: 73.2 },
+    { centerX: 26.8, centerY: 73.2 },
+    { centerX: 13.2, centerY: 86.8 },
+    { centerX: 26.8, centerY: 86.8 },
   ],
   blue: [
-    { row: 11.0, col: 11.0 },
-    { row: 11.0, col: 13.0 },
-    { row: 13.0, col: 11.0 },
-    { row: 13.0, col: 13.0 },
+    { centerX: 73.2, centerY: 73.2 },
+    { centerX: 86.8, centerY: 73.2 },
+    { centerX: 73.2, centerY: 86.8 },
+    { centerX: 86.8, centerY: 86.8 },
   ],
 };
+
+export const BASE_SLOT_GRID_COORDS = BASE_PIT_PERCENT_COORDS;
 
 /**
  * Token visual diameter in percentage of board width
@@ -168,15 +172,12 @@ export function getTokenBoardPercent(
 
   if (stepCount < 0) {
     // Inside Base: coordinates are exact pit centers
-    const slot = BASE_SLOT_GRID_COORDS[color][tokenId] || BASE_SLOT_GRID_COORDS[color][0];
-    cellCenterX = (slot.col - 0.5) * CELL_SIZE_PCT;
-    cellCenterY = (slot.row - 0.5) * CELL_SIZE_PCT;
-
+    const pit = BASE_PIT_PERCENT_COORDS[color]?.[tokenId] || BASE_PIT_PERCENT_COORDS[color]?.[0] || { centerX: 20, centerY: 20 };
     return {
-      left: cellCenterX - HALF_TOKEN,
-      top: cellCenterY - HALF_TOKEN,
-      centerX: cellCenterX,
-      centerY: cellCenterY,
+      left: pit.centerX - HALF_TOKEN,
+      top: pit.centerY - HALF_TOKEN,
+      centerX: pit.centerX,
+      centerY: pit.centerY,
     };
   }
 

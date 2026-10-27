@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import {
   GameState,
   PlayerColor,
@@ -16,49 +15,54 @@ import {
   getCurrentPlayer,
   EmojiEvent,
   COLOR_HEX,
-  BotDifficulty,
 } from './lib/ludoEngine.js';
 import { sounds } from './lib/audioEffects.js';
 import { LudoBoard } from './components/LudoBoard.js';
 import { PlayerCard } from './components/PlayerCard.js';
+import { SharedDiceControl } from './components/SharedDiceControl.js';
+import { GameEntryScreen, BotGameConfig, PassAndPlayConfigInput } from './components/GameEntryScreen.js';
+import { WaitingRoomView } from './components/WaitingRoomView.js';
 import { AnimatedEmojiOverlay, QuickEmojiBar } from './components/AnimatedEmojiOverlay.js';
 import { VictoryModal } from './components/VictoryModal.js';
-import { GameSetupModal } from './components/GameSetupModal.js';
 import { RulesModal } from './components/RulesModal.js';
 import {
   Volume2,
   VolumeX,
   RotateCcw,
   BookOpen,
-  Settings,
   Copy,
   Check,
-  Bot,
+  ArrowLeft,
+  Crown,
   Zap,
-  Sparkles,
-  Smartphone,
-  ChevronRight,
 } from 'lucide-react';
 
+type AppView = 'menu' | 'waiting_room' | 'game';
+
 export default function App() {
+  // App navigation view: 'menu' (entry screen), 'waiting_room' (online lobby), 'game' (play arena)
+  const [currentView, setCurrentView] = useState<AppView>('menu');
+
   // Game State
   const [gameState, setGameState] = useState<GameState>(() =>
     createNewGame('single_player', 'You', 'red', 3)
   );
 
+  // Online multiplayer state
+  const [isHost, setIsHost] = useState(false);
+  const [myPlayerId, setMyPlayerId] = useState<string>('');
+  const [isLoadingOnline, setIsLoadingOnline] = useState(false);
+  const [onlineErrorMessage, setOnlineErrorMessage] = useState<string | null>(null);
+
   // Audio mute state
   const [isMuted, setIsMuted] = useState(() => sounds.getMuted());
 
-  // Modals & Panels
-  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  // Rules Modal
   const [isRulesOpen, setIsRulesOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
   // Fast bot mode toggle
   const [isFastBot, setIsFastBot] = useState(false);
-
-  // Mobile frame wrapper view or full-width view
-  const [isMobileFrame, setIsMobileFrame] = useState(true);
 
   // Animated token hopping override: { color, tokenId, stepCount }
   const [animatedTokenStep, setAnimatedTokenStep] = useState<{
@@ -100,12 +104,15 @@ export default function App() {
   // Broadcast Emoji Reaction
   const handleSendEmoji = useCallback(
     (emoji: string, text?: string) => {
-      const human = gameState.players.find((p) => p.type === 'human') || gameState.players[0];
+      const activePlayer = gameState.players.find((p) => p.id === myPlayerId) ||
+        gameState.players.find((p) => p.type === 'human') ||
+        gameState.players[0];
+
       const newEvent: EmojiEvent = {
         id: 'emoji-' + Math.random().toString(36).substring(2, 9),
-        senderId: human.id,
-        senderName: human.name,
-        senderColor: human.color,
+        senderId: activePlayer.id,
+        senderName: activePlayer.name,
+        senderColor: activePlayer.color,
         emoji,
         text,
         timestamp: Date.now(),
@@ -121,7 +128,7 @@ export default function App() {
         }).catch(() => {});
       }
     },
-    [gameState.id, gameState.mode, gameState.players]
+    [gameState.id, gameState.mode, gameState.players, myPlayerId]
   );
 
   // Trigger Local Bot Reaction on special events
@@ -157,7 +164,7 @@ export default function App() {
 
   // Connect to backend SSE stream for online rooms
   useEffect(() => {
-    if (gameState.mode === 'online_room') {
+    if (gameState.mode === 'online_room' && (currentView === 'waiting_room' || currentView === 'game')) {
       const source = new EventSource(`/api/rooms/${gameState.id}/stream`);
       sseRef.current = source;
 
@@ -165,6 +172,11 @@ export default function App() {
         try {
           const updatedState = JSON.parse(e.data) as GameState;
           setGameState(updatedState);
+
+          // If game started, automatically switch from waiting room to game view
+          if (updatedState.status === 'playing' && currentView === 'waiting_room') {
+            setCurrentView('game');
+          }
         } catch {}
       });
 
@@ -180,24 +192,20 @@ export default function App() {
         source.close();
       };
     }
-  }, [gameState.id, gameState.mode]);
+  }, [gameState.id, gameState.mode, currentView]);
 
-  // Roll Dice Action
+  // Handle Dice Rolling
   const handleRollDice = useCallback(() => {
     if (gameState.hasRolled || gameState.isRolling || gameState.status !== 'playing' || isHopping) {
       return;
     }
 
     sounds.playDiceRoll();
-
-    // Visual rolling wobble
     setGameState((prev) => ({ ...prev, isRolling: true }));
 
     setTimeout(() => {
       setGameState((prev) => {
-        // Roll dice (autoPass is false so player sees what was rolled)
         const rolled = rollDice(prev, undefined, false);
-
         if (rolled.lastAction?.type === 'pass') {
           sounds.playPass();
         } else if (rolled.diceValue === 6) {
@@ -314,13 +322,13 @@ export default function App() {
     [gameState, isFastBot, isHopping, triggerBotReaction]
   );
 
-  // Automated Client-Side Bot Loop (Single Player & Local Play)
+  // Automated Client-Side Bot Loop (Single Player Match)
   useEffect(() => {
     if (gameState.mode === 'online_room') return; // Handled by server scheduler
     if (gameState.status !== 'playing' || isHopping) return;
 
-    const currentPlayer = getCurrentPlayer(gameState);
-    if (!currentPlayer || currentPlayer.type !== 'bot') {
+    const currentP = getCurrentPlayer(gameState);
+    if (!currentP || currentP.type !== 'bot') {
       if (botTurnTimerRef.current) {
         clearTimeout(botTurnTimerRef.current);
         botTurnTimerRef.current = null;
@@ -340,7 +348,7 @@ export default function App() {
           setGameState((prev) => {
             const rolled = rollDice(prev, undefined, false);
             if (rolled.diceValue === 6 && Math.random() < 0.5) {
-              triggerBotReaction(currentPlayer.color, 'roll6');
+              triggerBotReaction(currentP.color, 'roll6');
             }
             if (rolled.lastAction?.type === 'pass') {
               sounds.playPass();
@@ -370,7 +378,7 @@ export default function App() {
     }
   }, [gameState, isFastBot, isHopping, executeMoveToken, triggerBotReaction]);
 
-  // Restart / Rematch
+  // Restart Current Round
   const handleRestart = () => {
     const human = gameState.players.find((p) => p.type === 'human') || gameState.players[0];
     const botCount = gameState.players.filter((p) => p.type === 'bot').length;
@@ -378,64 +386,197 @@ export default function App() {
     setGameState(freshGame);
   };
 
-  // Launch New Game Setup
-  const handleStartGame = (config: {
-    mode: 'single_player' | 'pass_and_play' | 'online_room';
-    playerName: string;
-    playerColor: PlayerColor;
-    botCount: number;
-    botDifficulty: BotDifficulty;
-    roomId?: string;
-  }) => {
-    const roomId = config.roomId || 'ROOM-' + Math.floor(1000 + Math.random() * 9000);
+  // Launch Bot Game from Entry Screen
+  const handleStartBotGame = (config: BotGameConfig) => {
     const newGame = createNewGame(
-      config.mode,
+      'single_player',
       config.playerName,
       config.playerColor,
       config.botCount,
-      roomId
+      'BOT-' + Math.floor(1000 + Math.random() * 9000)
     );
-
     newGame.players.forEach((p) => {
       if (p.type === 'bot') {
-        p.botDifficulty = config.botDifficulty;
+        p.botDifficulty = config.difficulty;
       }
     });
-
     setGameState(newGame);
-    setIsSetupOpen(false);
+    setCurrentView('game');
   };
 
-  const currentPlayer = getCurrentPlayer(gameState);
-  const currentTheme = currentPlayer ? COLOR_HEX[currentPlayer.color] : COLOR_HEX.red;
-  const isHumanTurn = currentPlayer?.type === 'human';
+  // Launch Pass & Play from Entry Screen
+  const handleStartPassAndPlay = (config: PassAndPlayConfigInput) => {
+    const newGame = createNewGame(
+      'pass_and_play',
+      config.players[0].name,
+      config.players[0].color,
+      0,
+      'LOCAL-' + Math.floor(1000 + Math.random() * 9000),
+      {
+        playerCount: config.playerCount,
+        players: config.players,
+      }
+    );
+    setGameState(newGame);
+    setCurrentView('game');
+  };
 
-  // Find player for each of the 4 board corners
+  // Create Online Room
+  const handleCreateOnlineRoom = async (playerName: string, playerColor: PlayerColor) => {
+    setIsLoadingOnline(true);
+    setOnlineErrorMessage(null);
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'online_room',
+          playerName,
+          playerColor,
+          botCount: 0,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to create online room. Please try again.');
+      }
+
+      const initialRoom = (await res.json()) as GameState;
+      setGameState(initialRoom);
+      setIsHost(true);
+      setMyPlayerId(initialRoom.players[0].id);
+      setCurrentView('waiting_room');
+    } catch (err: any) {
+      setOnlineErrorMessage(err?.message || 'Error connecting to room server.');
+    } finally {
+      setIsLoadingOnline(false);
+    }
+  };
+
+  // Join Existing Online Room
+  const handleJoinOnlineRoom = async (roomId: string, playerName: string) => {
+    setIsLoadingOnline(true);
+    setOnlineErrorMessage(null);
+    try {
+      const res = await fetch(`/api/rooms/${roomId}/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to join room.');
+      }
+
+      setGameState(data);
+      setIsHost(false);
+      setMyPlayerId(data.assignedPlayerId);
+
+      if (data.status === 'playing') {
+        setCurrentView('game');
+      } else {
+        setCurrentView('waiting_room');
+      }
+    } catch (err: any) {
+      setOnlineErrorMessage(err?.message || 'Error joining online room.');
+    } finally {
+      setIsLoadingOnline(false);
+    }
+  };
+
+  // Start Online Game (Host Trigger)
+  const handleStartOnlineGame = async () => {
+    try {
+      const res = await fetch(`/api/rooms/${gameState.id}/start`, {
+        method: 'POST',
+      });
+      if (res.ok) {
+        const startedState = (await res.json()) as GameState;
+        setGameState(startedState);
+        setCurrentView('game');
+      }
+    } catch {}
+  };
+
+  // Leave Waiting Room / Game
+  const handleLeaveRoom = () => {
+    sounds.playClick();
+    if (gameState.mode === 'online_room' && myPlayerId) {
+      fetch(`/api/rooms/${gameState.id}/leave`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: myPlayerId }),
+      }).catch(() => {});
+    }
+    if (sseRef.current) {
+      sseRef.current.close();
+    }
+    setCurrentView('menu');
+  };
+
+  // Turn status calculations
+  const currentPlayer = getCurrentPlayer(gameState);
+
+  const isHumanTurn =
+    gameState.mode === 'pass_and_play'
+      ? true
+      : gameState.mode === 'online_room'
+      ? currentPlayer?.id === myPlayerId
+      : currentPlayer?.type === 'human';
+
+  const canRoll =
+    isHumanTurn &&
+    !gameState.hasRolled &&
+    !gameState.isRolling &&
+    gameState.status === 'playing' &&
+    !isHopping;
+
+  // Render player stations according to participants
   const greenPlayer = gameState.players.find((p) => p.color === 'green');
   const yellowPlayer = gameState.players.find((p) => p.color === 'yellow');
   const redPlayer = gameState.players.find((p) => p.color === 'red');
   const bluePlayer = gameState.players.find((p) => p.color === 'blue');
 
-  // One-click dice tap: rolls if not rolled, or deploys/advances if legal move is available
-  const handleDiceOrAutoMove = () => {
-    if (!gameState.hasRolled) {
-      handleRollDice();
-    } else if (gameState.movableTokenIds.length > 0 && !isHopping) {
-      // If exactly 1 movable token, or all movable tokens are in base, move first legal token
-      const allInBase = gameState.movableTokenIds.every((id) => {
-        const t = gameState.tokens[gameState.currentTurn].find((tok) => tok.id === id);
-        return t && t.state === 'base';
-      });
+  // VIEW 1: Initial Game Entry Screen
+  if (currentView === 'menu') {
+    return (
+      <>
+        <GameEntryScreen
+          onStartBotGame={handleStartBotGame}
+          onStartPassAndPlay={handleStartPassAndPlay}
+          onCreateOnlineRoom={handleCreateOnlineRoom}
+          onJoinOnlineRoom={handleJoinOnlineRoom}
+          isLoading={isLoadingOnline}
+          errorMessage={onlineErrorMessage}
+          onOpenRules={() => setIsRulesOpen(true)}
+        />
+        <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
+      </>
+    );
+  }
 
-      if (gameState.movableTokenIds.length === 1 || allInBase) {
-        executeMoveToken(gameState.movableTokenIds[0]);
-      }
-    }
-  };
+  // VIEW 2: Waiting Room Lobby for Play with Friends
+  if (currentView === 'waiting_room') {
+    return (
+      <>
+        <WaitingRoomView
+          gameState={gameState}
+          isHost={isHost}
+          onStartGame={handleStartOnlineGame}
+          onLeaveRoom={handleLeaveRoom}
+        />
+        <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
+      </>
+    );
+  }
 
+  // VIEW 3: Gameplay Arena
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-1.5 sm:p-4 selection:bg-amber-500 selection:text-slate-950 font-outfit">
-      
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-between p-2 sm:p-4 selection:bg-amber-500 selection:text-slate-950 font-outfit relative overflow-x-hidden">
+      {/* Background Lighting */}
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-amber-600/10 via-slate-950/80 to-slate-950 -z-10" />
+
       {/* Animated Emoji Floating Layer */}
       <AnimatedEmojiOverlay
         events={emojiEvents}
@@ -447,57 +588,53 @@ export default function App() {
       <VictoryModal
         gameState={gameState}
         onRestart={handleRestart}
-        onNewGameSetup={() => setIsSetupOpen(true)}
-      />
-
-      {/* Game Setup Dialog */}
-      <GameSetupModal
-        isOpen={isSetupOpen}
-        onClose={() => setIsSetupOpen(false)}
-        onStartGame={handleStartGame}
+        onNewGameSetup={() => setCurrentView('menu')}
       />
 
       {/* Rules & Help Modal */}
-      <RulesModal
-        isOpen={isRulesOpen}
-        onClose={() => setIsRulesOpen(false)}
-      />
+      <RulesModal isOpen={isRulesOpen} onClose={() => setIsRulesOpen(false)} />
 
-      {/* Main Container - Mobile Phone Frame or Expanded View */}
-      <div
-        className={`w-full flex flex-col transition-all duration-300 ${
-          isMobileFrame
-            ? 'max-w-[420px] rounded-3xl bg-slate-900/95 border-2 border-slate-800 shadow-2xl p-2.5 sm:p-3 my-1'
-            : 'max-w-2xl bg-slate-900/80 rounded-3xl p-4 border border-slate-800'
-        }`}
-      >
+      {/* Main Board Arena Container */}
+      <div className="w-full max-w-xl md:max-w-2xl bg-slate-900/90 backdrop-blur-md rounded-3xl border border-slate-800 shadow-2xl p-2.5 sm:p-4 flex flex-col gap-2 my-auto">
         {/* ================= HEADER BAR ================= */}
         <header className="flex items-center justify-between gap-2 px-1 pb-2 border-b border-slate-800/80">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-300 flex items-center justify-center text-slate-950 shadow-md">
-              <Sparkles className="w-4 h-4 fill-slate-950" />
-            </div>
+            <button
+              onClick={handleLeaveRoom}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition active:scale-95 cursor-pointer"
+              title="Return to Main Menu"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Menu</span>
+            </button>
+
             <div>
-              <h1 className="font-fredoka font-black text-sm sm:text-base tracking-wide text-white leading-tight">
+              <h1 className="font-fredoka font-black text-sm sm:text-base tracking-wide text-white leading-tight flex items-center gap-1.5">
+                <Crown className="w-4 h-4 text-amber-400" />
                 LUDO ROYAL
               </h1>
-              <span className="text-[10px] font-bold text-amber-400 capitalize flex items-center gap-1">
-                {gameState.mode.replace('_', ' ')}
-                {gameState.mode === 'single_player' && ' 🤖'}
+              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+                {gameState.mode === 'single_player'
+                  ? 'Play with Bot 🤖'
+                  : gameState.mode === 'pass_and_play'
+                  ? 'Pass & Play 👥'
+                  : 'Play with Friends 🌐'}
               </span>
             </div>
           </div>
 
           <div className="flex items-center gap-1.5">
-            {/* Room Code Badge */}
-            <button
-              onClick={handleCopyRoomCode}
-              className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/80 text-[11px] font-mono flex items-center gap-1 shadow-sm cursor-pointer"
-              title="Click to copy Room Code"
-            >
-              <span>{gameState.id}</span>
-              {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
-            </button>
+            {/* Room Code Badge (if online room) */}
+            {gameState.mode === 'online_room' && (
+              <button
+                onClick={handleCopyRoomCode}
+                className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/80 text-[11px] font-mono flex items-center gap-1 shadow-sm cursor-pointer"
+                title="Click to copy Room Code"
+              >
+                <span>{gameState.id}</span>
+                {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+              </button>
+            )}
 
             {/* Sound Mute Toggle */}
             <button
@@ -524,189 +661,130 @@ export default function App() {
               <BookOpen className="w-4 h-4" />
             </button>
 
-            {/* Setup / Settings */}
+            {/* Restart Match */}
             <button
               onClick={() => {
                 sounds.playClick();
-                setIsSetupOpen(true);
+                handleRestart();
               }}
-              className="p-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 transition-all cursor-pointer"
-              title="Game Setup / Modes"
+              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95"
+              title="Restart Round"
             >
-              <Settings className="w-4 h-4" />
+              <RotateCcw className="w-4 h-4" />
             </button>
           </div>
         </header>
 
-        {/* ================= TURN STATUS BANNER ================= */}
-        <div className="my-2 px-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-2 truncate">
-            <span
-              className="w-2.5 h-2.5 rounded-full animate-ping flex-shrink-0"
-              style={{ backgroundColor: currentTheme.primary }}
-            />
-            <span className="font-bold text-white truncate">
-              {currentPlayer?.name}
-              <span className="font-normal text-slate-400 ml-1">
-                ({currentPlayer?.color.toUpperCase()})
-              </span>
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1 font-semibold text-[11px]" style={{ color: currentTheme.light }}>
-            {gameState.isRolling ? (
-              <span className="animate-pulse">Rolling dice...</span>
-            ) : isHopping ? (
-              <span className="animate-bounce">Moving token...</span>
-            ) : gameState.diceValue !== null ? (
-              gameState.movableTokenIds.length > 0 ? (
-                <span>Rolled {gameState.diceValue}! Tap piece to move</span>
-              ) : (
-                <span>Rolled {gameState.diceValue} — No moves!</span>
-              )
-            ) : isHumanTurn ? (
-              <span className="animate-bounce">Tap dice to roll!</span>
-            ) : (
-              <span>Bot turn...</span>
-            )}
-          </div>
-        </div>
-
         {/* ================= TOP PLAYER STATIONS ================= */}
-        <div className="grid grid-cols-2 gap-2 mb-1.5">
-          {/* Top-Left: Green Player */}
-          {greenPlayer && (
+        <div className="grid grid-cols-2 gap-2">
+          {greenPlayer ? (
             <PlayerCard
               player={greenPlayer}
               isCurrentTurn={gameState.currentTurn === 'green'}
-              diceValue={gameState.diceValue}
-              isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'green' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
-              onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.green}
               position="top-left"
               isRankedWinner={gameState.rankings.includes('green')}
             />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
+              Empty Green Seat
+            </div>
           )}
 
-          {/* Top-Right: Yellow Player */}
-          {yellowPlayer && (
+          {yellowPlayer ? (
             <PlayerCard
               player={yellowPlayer}
               isCurrentTurn={gameState.currentTurn === 'yellow'}
-              diceValue={gameState.diceValue}
-              isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'yellow' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
-              onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.yellow}
               position="top-right"
               isRankedWinner={gameState.rankings.includes('yellow')}
             />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
+              Empty Yellow Seat
+            </div>
           )}
         </div>
 
         {/* ================= CENTRAL 15X15 LUDO BOARD ================= */}
-        <div className="relative my-auto flex items-center justify-center">
+        <div className="relative my-1 flex items-center justify-center">
           <LudoBoard
             gameState={gameState}
             onTokenClick={executeMoveToken}
-            isCurrentPlayerTurn={(isHumanTurn || gameState.mode === 'pass_and_play') && !isHopping}
+            isCurrentPlayerTurn={isHumanTurn && !isHopping}
             animatedTokenOverride={animatedTokenStep}
           />
         </div>
 
         {/* ================= BOTTOM PLAYER STATIONS ================= */}
-        <div className="grid grid-cols-2 gap-2 mt-1.5">
-          {/* Bottom-Left: Red Player */}
-          {redPlayer && (
+        <div className="grid grid-cols-2 gap-2">
+          {redPlayer ? (
             <PlayerCard
               player={redPlayer}
               isCurrentTurn={gameState.currentTurn === 'red'}
-              diceValue={gameState.diceValue}
-              isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'red' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
-              onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.red}
               position="bottom-left"
               isRankedWinner={gameState.rankings.includes('red')}
             />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
+              Empty Red Seat
+            </div>
           )}
 
-          {/* Bottom-Right: Blue Player */}
-          {bluePlayer && (
+          {bluePlayer ? (
             <PlayerCard
               player={bluePlayer}
               isCurrentTurn={gameState.currentTurn === 'blue'}
-              diceValue={gameState.diceValue}
-              isRolling={gameState.isRolling}
-              canRoll={gameState.currentTurn === 'blue' && (!gameState.hasRolled || gameState.movableTokenIds.length > 0)}
-              onRoll={handleDiceOrAutoMove}
               tokens={gameState.tokens.blue}
               position="bottom-right"
               isRankedWinner={gameState.rankings.includes('blue')}
             />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
+              Empty Blue Seat
+            </div>
+          )}
+        </div>
+
+        {/* ================= ONE SHARED BOTTOM-CENTRE DICE CONTROL ================= */}
+        {currentPlayer && (
+          <SharedDiceControl
+            gameState={gameState}
+            activePlayer={currentPlayer}
+            isRolling={gameState.isRolling}
+            canRoll={canRoll}
+            onRoll={handleRollDice}
+            onQuickMove={executeMoveToken}
+          />
+        )}
+
+        {/* ================= RECENT EVENT TICKER & FAST BOT TOGGLE ================= */}
+        <div className="flex items-center justify-between gap-2 px-1 text-[11px] text-slate-400">
+          <div className="flex items-center gap-1.5 truncate">
+            <Zap className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+            <span className="truncate">{gameState.history[0] || 'Game started! Good luck!'}</span>
+          </div>
+
+          {gameState.mode === 'single_player' && (
+            <button
+              onClick={() => {
+                sounds.playClick();
+                setIsFastBot(!isFastBot);
+              }}
+              className={`px-2 py-0.5 rounded-lg border text-[10px] font-bold shrink-0 transition ${
+                isFastBot
+                  ? 'bg-amber-500/20 border-amber-400 text-amber-400'
+                  : 'bg-slate-800 border-slate-700 text-slate-400'
+              }`}
+            >
+              Fast Bot: {isFastBot ? 'ON' : 'OFF'}
+            </button>
           )}
         </div>
 
         {/* ================= QUICK EMOJI BAR ================= */}
-        <div className="mt-2">
-          <QuickEmojiBar onSendEmoji={handleSendEmoji} />
-        </div>
-
-        {/* ================= RECENT EVENT TICKER ================= */}
-        <div className="mt-2 px-3 py-1.5 rounded-xl bg-slate-950/50 border border-slate-850 text-[11px] text-slate-400 truncate flex items-center gap-1.5">
-          <Zap className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
-          <span className="truncate">
-            {gameState.history[0] || 'Game in progress...'}
-          </span>
-        </div>
-
-        {/* ================= MOBILE BOTTOM ACTIONS BAR ================= */}
-        <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-          {/* Fast Bot Toggle */}
-          <button
-            onClick={() => {
-              sounds.playClick();
-              setIsFastBot(!isFastBot);
-            }}
-            className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-              isFastBot
-                ? 'bg-amber-500/20 border-amber-400 text-amber-400 shadow-sm'
-                : 'bg-slate-800/60 border-slate-700 text-slate-400 hover:bg-slate-800'
-            }`}
-            title="Toggle Bot Speed"
-          >
-            <Bot className="w-3.5 h-3.5" />
-            <span>Fast Bot {isFastBot ? 'ON' : 'OFF'}</span>
-          </button>
-
-          {/* Mobile Frame Toggle */}
-          <button
-            onClick={() => {
-              sounds.playClick();
-              setIsMobileFrame(!isMobileFrame);
-            }}
-            className="px-2.5 py-1.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-            title={isMobileFrame ? 'Expand View' : 'Phone App View'}
-          >
-            <Smartphone className="w-3.5 h-3.5 text-slate-400" />
-            <span>{isMobileFrame ? 'Phone View' : 'Wide View'}</span>
-          </button>
-
-          {/* New Game / Reset */}
-          <button
-            onClick={() => {
-              sounds.playClick();
-              handleRestart();
-            }}
-            className="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-750 text-slate-200 border border-slate-700 text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
-            title="Restart current round"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Restart</span>
-          </button>
-        </div>
-
+        <QuickEmojiBar onSendEmoji={handleSendEmoji} />
       </div>
     </div>
   );

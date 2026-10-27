@@ -37,6 +37,9 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
   const cellTokenGroups: Record<string, Array<{ token: Token; isMovable: boolean }>> = {};
 
   COLOR_ORDER.forEach((c) => {
+    // Only render tokens for colors currently participating in this match
+    if (!gameState.players.some((p) => p.color === c)) return;
+
     const colorTokens = tokens[c] || [];
     colorTokens.forEach((t) => {
       const isMovable = c === currentTurn && movableTokenIds.includes(t.id);
@@ -90,8 +93,13 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
 
   const safeTrackSet = SAFE_TRACK_POSITIONS;
 
+  const isGreenActive = gameState.players.some((p) => p.color === 'green');
+  const isYellowActive = gameState.players.some((p) => p.color === 'yellow');
+  const isRedActive = gameState.players.some((p) => p.color === 'red');
+  const isBlueActive = gameState.players.some((p) => p.color === 'blue');
+
   return (
-    <div className="relative w-full aspect-square max-w-[340px] xs:max-w-[360px] sm:max-w-[410px] mx-auto select-none p-1 sm:p-2 bg-gradient-to-b from-slate-900 to-slate-950 rounded-3xl shadow-2xl border-2 sm:border-3 border-slate-700/80">
+    <div className="relative w-full aspect-square max-w-[340px] xs:max-w-[360px] sm:max-w-[420px] md:max-w-[460px] mx-auto select-none p-1 sm:p-2 bg-gradient-to-b from-slate-900 to-slate-950 rounded-3xl shadow-2xl border-2 sm:border-3 border-slate-700/80">
       {/* Board Base Surface (15x15 CSS Grid) */}
       <div className="relative w-full h-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-inner grid grid-cols-15 grid-rows-15">
 
@@ -100,15 +108,17 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         <div
           onClick={() => handleBaseClick('green')}
           className={`col-start-1 col-end-7 row-start-1 row-end-7 p-2 bg-gradient-to-br from-emerald-600 to-emerald-800 border-r-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'green' && baseTokensMovable ? 'cursor-pointer ring-4 ring-emerald-300 ring-inset animate-pulse' : ''
+            !isGreenActive ? 'opacity-35 grayscale-[50%]' : ''
+          } ${
+            isGreenActive && currentTurn === 'green' && baseTokensMovable ? 'cursor-pointer ring-4 ring-emerald-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
             <span className="flex items-center gap-1 font-fredoka">
               <span className="w-2 h-2 rounded-full bg-emerald-300 inline-block" />
-              GREEN
+              GREEN {!isGreenActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
             </span>
-            <Crown className="w-3.5 h-3.5 text-emerald-200" />
+            {isGreenActive && <Crown className="w-3.5 h-3.5 text-emerald-200" />}
           </div>
 
           {/* White Box containing the 4 circular pits */}
@@ -123,7 +133,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
             ))}
           </div>
 
-          {currentTurn === 'green' && baseTokensMovable && (
+          {isGreenActive && currentTurn === 'green' && baseTokensMovable && (
             <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
               <span className="px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
                 <Rocket className="w-2.5 h-2.5" /> DEPLOY
@@ -136,15 +146,17 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         <div
           onClick={() => handleBaseClick('yellow')}
           className={`col-start-10 col-end-16 row-start-1 row-end-7 p-2 bg-gradient-to-br from-amber-500 to-amber-700 border-l-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'yellow' && baseTokensMovable ? 'cursor-pointer ring-4 ring-amber-300 ring-inset animate-pulse' : ''
+            !isYellowActive ? 'opacity-35 grayscale-[50%]' : ''
+          } ${
+            isYellowActive && currentTurn === 'yellow' && baseTokensMovable ? 'cursor-pointer ring-4 ring-amber-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
             <span className="flex items-center gap-1 font-fredoka">
               <span className="w-2 h-2 rounded-full bg-amber-200 inline-block" />
-              YELLOW
+              YELLOW {!isYellowActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
             </span>
-            <Crown className="w-3.5 h-3.5 text-amber-200" />
+            {isYellowActive && <Crown className="w-3.5 h-3.5 text-amber-200" />}
           </div>
 
           <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-white shadow-md border-2 border-amber-800/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
@@ -158,7 +170,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
             ))}
           </div>
 
-          {currentTurn === 'yellow' && baseTokensMovable && (
+          {isYellowActive && currentTurn === 'yellow' && baseTokensMovable && (
             <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
               <span className="px-2 py-0.5 rounded-full bg-amber-300 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
                 <Rocket className="w-2.5 h-2.5" /> DEPLOY
@@ -171,15 +183,17 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         <div
           onClick={() => handleBaseClick('red')}
           className={`col-start-1 col-end-7 row-start-10 row-end-16 p-2 bg-gradient-to-br from-rose-600 to-rose-800 border-r-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'red' && baseTokensMovable ? 'cursor-pointer ring-4 ring-rose-300 ring-inset animate-pulse' : ''
+            !isRedActive ? 'opacity-35 grayscale-[50%]' : ''
+          } ${
+            isRedActive && currentTurn === 'red' && baseTokensMovable ? 'cursor-pointer ring-4 ring-rose-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
             <span className="flex items-center gap-1 font-fredoka">
               <span className="w-2 h-2 rounded-full bg-rose-300 inline-block" />
-              RED
+              RED {!isRedActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
             </span>
-            <Crown className="w-3.5 h-3.5 text-rose-200" />
+            {isRedActive && <Crown className="w-3.5 h-3.5 text-rose-200" />}
           </div>
 
           <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-white shadow-md border-2 border-rose-800/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
@@ -193,7 +207,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
             ))}
           </div>
 
-          {currentTurn === 'red' && baseTokensMovable && (
+          {isRedActive && currentTurn === 'red' && baseTokensMovable && (
             <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
               <span className="px-2.5 py-0.5 rounded-full bg-rose-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
                 <Rocket className="w-2.5 h-2.5" /> DEPLOY
@@ -206,15 +220,17 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         <div
           onClick={() => handleBaseClick('blue')}
           className={`col-start-10 col-end-16 row-start-10 row-end-16 p-2 bg-gradient-to-br from-blue-600 to-blue-800 border-l-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-            currentTurn === 'blue' && baseTokensMovable ? 'cursor-pointer ring-4 ring-blue-300 ring-inset animate-pulse' : ''
+            !isBlueActive ? 'opacity-35 grayscale-[50%]' : ''
+          } ${
+            isBlueActive && currentTurn === 'blue' && baseTokensMovable ? 'cursor-pointer ring-4 ring-blue-300 ring-inset animate-pulse' : ''
           }`}
         >
           <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
             <span className="flex items-center gap-1 font-fredoka">
               <span className="w-2 h-2 rounded-full bg-blue-300 inline-block" />
-              BLUE
+              BLUE {!isBlueActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
             </span>
-            <Crown className="w-3.5 h-3.5 text-blue-200" />
+            {isBlueActive && <Crown className="w-3.5 h-3.5 text-blue-200" />}
           </div>
 
           <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-white shadow-md border-2 border-blue-800/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">

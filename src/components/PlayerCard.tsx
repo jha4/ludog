@@ -1,54 +1,47 @@
 import React from 'react';
-import { Player, PlayerColor, COLOR_HEX, Token } from '../lib/ludoEngine.js';
-import { Dice3D } from './Dice3D.js';
+import { Player, COLOR_HEX, Token } from '../lib/ludoEngine.js';
 import { Crown, Bot, User, CheckCircle2 } from 'lucide-react';
 
 interface PlayerCardProps {
   player: Player;
   isCurrentTurn: boolean;
-  diceValue: number | null;
-  isRolling: boolean;
-  canRoll: boolean;
-  onRoll: () => void;
   tokens: Token[];
   position: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   isRankedWinner?: boolean;
+  statusText?: string;
 }
 
 export const PlayerCard: React.FC<PlayerCardProps> = ({
   player,
   isCurrentTurn,
-  diceValue,
-  isRolling,
-  canRoll,
-  onRoll,
   tokens,
   position,
   isRankedWinner,
+  statusText,
 }) => {
   const colorTheme = COLOR_HEX[player.color] || COLOR_HEX.red;
   const homeCount = tokens.filter((t) => t.state === 'home').length;
-  const inTrackCount = tokens.filter((t) => t.state === 'track' || t.state === 'homeColumn').length;
+  const onTrackCount = tokens.filter((t) => t.state === 'track' || t.state === 'homeColumn').length;
+  const inBaseCount = tokens.filter((t) => t.state === 'base').length;
 
-  const isBottom = position.startsWith('bottom');
   const isRight = position.endsWith('right');
 
   return (
     <div
-      className={`relative flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 rounded-2xl transition-all duration-300 ${
+      className={`relative flex items-center gap-2 p-2 sm:p-2.5 rounded-2xl transition-all duration-300 select-none ${
         isCurrentTurn
-          ? 'bg-slate-800/95 shadow-lg border-2 scale-101 z-20'
-          : 'bg-slate-900/70 border border-slate-800/80 opacity-90'
+          ? 'bg-slate-800/95 shadow-lg border-2 z-20 scale-[1.02]'
+          : 'bg-slate-900/80 border border-slate-800/80 opacity-90'
       } ${isRight ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}
       style={{
         borderColor: isCurrentTurn ? colorTheme.primary : 'rgba(51, 65, 85, 0.6)',
-        boxShadow: isCurrentTurn ? `0 0 16px -2px ${colorTheme.primary}80` : undefined,
+        boxShadow: isCurrentTurn ? `0 0 16px -2px ${colorTheme.primary}70` : undefined,
       }}
     >
-      {/* Avatar Container with Ring */}
+      {/* Player Avatar */}
       <div className="relative flex-shrink-0">
         <div
-          className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center text-lg sm:text-2xl shadow-md border-2 ${
+          className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center text-lg sm:text-2xl shadow-md border-2 ${
             isCurrentTurn ? 'animate-pulse' : ''
           }`}
           style={{
@@ -59,9 +52,9 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
           {player.avatar}
         </div>
 
-        {/* Bot or Human badge */}
+        {/* Human / Bot Badge */}
         <span
-          className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-slate-900 text-slate-300 border border-slate-700 shadow"
+          className="absolute -bottom-1 -right-1 p-0.5 rounded-full bg-slate-950 text-slate-300 border border-slate-700 shadow"
           title={player.type === 'bot' ? 'AI Bot Player' : 'Human Player'}
         >
           {player.type === 'bot' ? (
@@ -73,71 +66,56 @@ export const PlayerCard: React.FC<PlayerCardProps> = ({
 
         {/* Winner Crown */}
         {isRankedWinner && (
-          <div className="absolute -top-2 -right-1 text-amber-400 animate-bounce">
-            <Crown className="w-3.5 h-3.5 fill-amber-400" />
+          <div className="absolute -top-2.5 -right-1 text-amber-400 animate-bounce">
+            <Crown className="w-4 h-4 fill-amber-400 drop-shadow" />
           </div>
         )}
       </div>
 
-      {/* Player Meta Details */}
+      {/* Meta Details */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1">
-          <span className="font-bold text-[11px] sm:text-xs text-white truncate max-w-[70px] xs:max-w-[100px] sm:max-w-[130px]">
+        <div className={`flex items-center gap-1.5 ${isRight ? 'justify-end' : 'justify-start'}`}>
+          <span className="font-bold text-xs sm:text-sm text-white truncate max-w-[90px] xs:max-w-[120px] sm:max-w-[160px]">
             {player.name}
           </span>
           {isCurrentTurn && (
             <span
-              className="w-1.5 h-1.5 rounded-full animate-ping flex-shrink-0"
+              className="w-2 h-2 rounded-full animate-ping flex-shrink-0"
               style={{ backgroundColor: colorTheme.primary }}
             />
           )}
         </div>
 
-        {/* Progress & Home Count */}
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="text-[10px] font-semibold text-slate-400">
-            {homeCount === 4 ? (
-              <span className="text-amber-400 flex items-center gap-0.5 font-bold">
-                <CheckCircle2 className="w-3 h-3" /> Won!
-              </span>
-            ) : (
-              `${homeCount}/4 Home`
-            )}
-          </span>
+        {/* Progress Counters */}
+        <div className={`flex items-center gap-1.5 mt-0.5 text-[10px] font-semibold text-slate-400 ${isRight ? 'justify-end' : 'justify-start'}`}>
+          {homeCount === 4 ? (
+            <span className="text-amber-400 flex items-center gap-0.5 font-bold">
+              <CheckCircle2 className="w-3 h-3" /> Won!
+            </span>
+          ) : (
+            <span className="flex items-center gap-1">
+              <span className="font-bold text-slate-200">{homeCount}/4</span> Home
+              {onTrackCount > 0 && (
+                <span className="text-slate-500">• {onTrackCount} active</span>
+              )}
+            </span>
+          )}
         </div>
 
-        {/* Active turn status */}
-        {isCurrentTurn && (
+        {/* Turn Status Message */}
+        {isCurrentTurn ? (
           <div
-            className="text-[10px] font-bold mt-0.5 animate-pulse truncate"
+            className="text-[10px] sm:text-[11px] font-bold mt-0.5 truncate animate-pulse"
             style={{ color: colorTheme.light }}
           >
-            {player.type === 'bot'
-              ? isRolling
-                ? 'Rolling...'
-                : diceValue
-                ? 'Thinking...'
-                : 'Bot turn...'
-              : diceValue
-              ? `Rolled ${diceValue}!`
-              : 'Tap to roll'}
+            {statusText || (player.type === 'bot' ? 'Thinking...' : 'Your turn')}
+          </div>
+        ) : (
+          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
+            {player.color.toUpperCase()}
           </div>
         )}
       </div>
-
-      {/* Embedded 3D Dice for Active Player */}
-      {isCurrentTurn && (
-        <div className="flex-shrink-0">
-          <Dice3D
-            value={diceValue}
-            isRolling={isRolling}
-            canRoll={canRoll && player.type === 'human'}
-            onRoll={onRoll}
-            color={player.color}
-            size="sm"
-          />
-        </div>
-      )}
     </div>
   );
 };
