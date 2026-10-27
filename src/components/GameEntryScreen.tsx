@@ -48,7 +48,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
   errorMessage = null,
   onOpenRules,
 }) => {
-  const [selectedMode, setSelectedMode] = useState<GameMode>('bot');
+  const [selectedMode, setSelectedMode] = useState<GameMode>('friends');
   const [userName, setUserName] = useState<string>('Commander');
   const [userColor, setUserColor] = useState<PlayerColor>('red');
   const [botCount, setBotCount] = useState<number>(3);
@@ -220,7 +220,37 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {/* Mode 1: Play with Bot */}
+            {/* Mode 1: Play with Friends */}
+            <motion.button
+              type="button"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => handleModeSelect('friends')}
+              className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] relative overflow-hidden ${
+                selectedMode === 'friends'
+                  ? 'bg-gradient-to-br from-amber-950/90 via-slate-900 to-amber-950/60 border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-950/50'
+                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-75 hover:opacity-100'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300">
+                  <Globe className="w-5 h-5" />
+                </div>
+                {selectedMode === 'friends' && (
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/40">
+                    Active
+                  </span>
+                )}
+              </div>
+              <div className="mt-3">
+                <div className="font-fredoka text-base font-bold text-white tracking-wide">Play with Friends</div>
+                <div className="text-[12px] text-slate-400 leading-snug mt-0.5">
+                  Create or join real online rooms via shareable codes.
+                </div>
+              </div>
+            </motion.button>
+
+            {/* Mode 2: Play with Bot */}
             <motion.button
               type="button"
               whileHover={{ scale: 1.02 }}
@@ -250,7 +280,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
               </div>
             </motion.button>
 
-            {/* Mode 2: Pass & Play */}
+            {/* Mode 3: Pass & Play */}
             <motion.button
               type="button"
               whileHover={{ scale: 1.02 }}
@@ -276,36 +306,6 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
                 <div className="font-fredoka text-base font-bold text-white tracking-wide">Pass & Play</div>
                 <div className="text-[12px] text-slate-400 leading-snug mt-0.5">
                   Local multiplayer on 1 device. 100% human players, 0 bots.
-                </div>
-              </div>
-            </motion.button>
-
-            {/* Mode 3: Play with Friends */}
-            <motion.button
-              type="button"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => handleModeSelect('friends')}
-              className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] relative overflow-hidden ${
-                selectedMode === 'friends'
-                  ? 'bg-gradient-to-br from-amber-950/90 via-slate-900 to-amber-950/60 border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-950/50'
-                  : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-75 hover:opacity-100'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300">
-                  <Globe className="w-5 h-5" />
-                </div>
-                {selectedMode === 'friends' && (
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/40">
-                    Active
-                  </span>
-                )}
-              </div>
-              <div className="mt-3">
-                <div className="font-fredoka text-base font-bold text-white tracking-wide">Play with Friends</div>
-                <div className="text-[12px] text-slate-400 leading-snug mt-0.5">
-                  Create or join real online rooms via shareable codes.
                 </div>
               </div>
             </motion.button>

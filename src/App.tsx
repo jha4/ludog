@@ -648,30 +648,6 @@ export default function App() {
             >
               {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
-
-            {/* Rules Dialog */}
-            <button
-              onClick={() => {
-                sounds.playClick();
-                setIsRulesOpen(true);
-              }}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer"
-              title="How to Play"
-            >
-              <BookOpen className="w-4 h-4" />
-            </button>
-
-            {/* Restart Match */}
-            <button
-              onClick={() => {
-                sounds.playClick();
-                handleRestart();
-              }}
-              className="p-2 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer active:scale-95"
-              title="Restart Round"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
           </div>
         </header>
 
@@ -716,8 +692,8 @@ export default function App() {
           />
         </div>
 
-        {/* ================= BOTTOM PLAYER STATIONS ================= */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* ================= BOTTOM PLAYER STATIONS & CENTRAL ROLL DICE ================= */}
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
           {redPlayer ? (
             <PlayerCard
               player={redPlayer}
@@ -728,8 +704,20 @@ export default function App() {
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
-              Empty Red Seat
+              Empty Red
             </div>
+          )}
+
+          {/* Central Dice Control in middle between Commander and Blitz Bot */}
+          {currentPlayer && (
+            <SharedDiceControl
+              gameState={gameState}
+              activePlayer={currentPlayer}
+              isRolling={gameState.isRolling}
+              canRoll={canRoll}
+              onRoll={handleRollDice}
+              onQuickMove={executeMoveToken}
+            />
           )}
 
           {bluePlayer ? (
@@ -742,22 +730,10 @@ export default function App() {
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
-              Empty Blue Seat
+              Empty Blue
             </div>
           )}
         </div>
-
-        {/* ================= ONE SHARED BOTTOM-CENTRE DICE CONTROL ================= */}
-        {currentPlayer && (
-          <SharedDiceControl
-            gameState={gameState}
-            activePlayer={currentPlayer}
-            isRolling={gameState.isRolling}
-            canRoll={canRoll}
-            onRoll={handleRollDice}
-            onQuickMove={executeMoveToken}
-          />
-        )}
 
         {/* ================= RECENT EVENT TICKER & FAST BOT TOGGLE ================= */}
         <div className="flex items-center justify-between gap-2 px-1 text-[11px] text-slate-400">
