@@ -9,6 +9,7 @@ import {
   selectBotMove,
   addPlayerToOnlineRoom,
   startOnlineRoomGame,
+  DIAGONAL_OPPOSITE_COLOR,
 } from './ludoEngine.ts';
 
 test('creates a fresh single player game with 1 human and 3 bots', () => {
@@ -215,21 +216,21 @@ test('online_room creates 1 human host, 0 bots, and status waiting', () => {
 test('addPlayerToOnlineRoom assigns available color and blocks 5th player', () => {
   let game = createNewGame('online_room', 'Host', 'red', 0, 'ROOM-888');
 
-  // Add 2nd player (assigned green as next in clockwise order)
+  // Add 2nd player (assigned yellow as diagonally opposite to host red)
   const res2 = addPlayerToOnlineRoom(game, { name: 'Player 2' });
   assert.equal('error' in res2, false);
   if (!('error' in res2)) {
     game = res2.state;
-    assert.equal(res2.player.color, 'green');
+    assert.equal(res2.player.color, 'yellow');
     assert.equal(game.players.length, 2);
   }
 
-  // Add 3rd player (assigned yellow)
+  // Add 3rd player (assigned green)
   const res3 = addPlayerToOnlineRoom(game, { name: 'Player 3' });
   assert.equal('error' in res3, false);
   if (!('error' in res3)) {
     game = res3.state;
-    assert.equal(res3.player.color, 'yellow');
+    assert.equal(res3.player.color, 'green');
     assert.equal(game.players.length, 3);
   }
 
@@ -277,4 +278,27 @@ test('three consecutive sixes penalizes and passes turn to next player', () => {
   game = rollDice(game, 6);
   assert.equal(game.consecutiveSixes, 0);
   assert.equal(game.currentTurn, 'green');
+});
+
+test('assigns diagonally opposite corners for 2-player games across modes', () => {
+  // 1. Single Player with 1 Bot (Red vs Yellow)
+  const sp1v1 = createNewGame('single_player', 'Alice', 'red', 1);
+  assert.equal(sp1v1.players.length, 2);
+  assert.equal(sp1v1.players[0].color, 'red');
+  assert.equal(sp1v1.players[1].color, 'yellow');
+  assert.equal(DIAGONAL_OPPOSITE_COLOR['red'], 'yellow');
+
+  // 2. Pass & Play with 2 Players (Red vs Yellow)
+  const pp2 = createNewGame('pass_and_play', 'P1', 'red', 0, 'ROOM-PP2');
+  assert.equal(pp2.players.length, 2);
+  assert.equal(pp2.players[0].color, 'red');
+  assert.equal(pp2.players[1].color, 'yellow');
+
+  // 3. Online Room with 2 Players (Host Red -> Joiner receives Yellow)
+  const onlineHost = createNewGame('online_room', 'Host', 'red', 0, 'ROOM-ON2');
+  const joinerRes = addPlayerToOnlineRoom(onlineHost, { name: 'Joiner' });
+  assert.equal('error' in joinerRes, false);
+  if (!('error' in joinerRes)) {
+    assert.equal(joinerRes.player.color, 'yellow');
+  }
 });

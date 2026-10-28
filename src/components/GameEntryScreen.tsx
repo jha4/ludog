@@ -94,7 +94,8 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
         difficulty,
       });
     } else if (selectedMode === 'pass_play') {
-      const activeColors = COLOR_ORDER.slice(0, passPlayCount);
+      const activeColors: PlayerColor[] =
+        passPlayCount === 2 ? ['red', 'yellow'] : COLOR_ORDER.slice(0, passPlayCount);
       const configuredPlayers = activeColors.map((c) => ({
         color: c,
         name: passPlayNames[c]?.trim() || `Player (${c.toUpperCase()})`,
@@ -426,7 +427,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
                   Custom Player Names
                 </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {COLOR_ORDER.slice(0, passPlayCount).map((col, idx) => (
+                  {(passPlayCount === 2 ? (['red', 'yellow'] as PlayerColor[]) : COLOR_ORDER.slice(0, passPlayCount)).map((col, idx) => (
                     <div
                       key={col}
                       className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 rounded-xl p-2 focus-within:border-emerald-400 transition"

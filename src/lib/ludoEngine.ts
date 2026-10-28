@@ -143,6 +143,13 @@ export interface PassAndPlayConfig {
   players?: Array<{ name: string; color: PlayerColor; avatar?: string }>;
 }
 
+export const DIAGONAL_OPPOSITE_COLOR: Record<PlayerColor, PlayerColor> = {
+  red: 'yellow',
+  yellow: 'red',
+  green: 'blue',
+  blue: 'green',
+};
+
 /**
  * Creates initial game state
  */
@@ -167,20 +174,34 @@ export function createNewGame(
       isReady: true,
     });
 
-    // Add requested number of bots (1, 2, or 3)
-    const otherColors = COLOR_ORDER.filter((c) => c !== playerColor);
     const count = Math.max(1, Math.min(3, botCount));
-    for (let i = 0; i < count; i++) {
-      const botProfile = BOT_PROFILES[i % BOT_PROFILES.length];
+    if (count === 1) {
+      // For 1v1 (2 players total), place the bot in the diagonally opposite window/corner
+      const botColor = DIAGONAL_OPPOSITE_COLOR[playerColor];
+      const botProfile = BOT_PROFILES[0];
       players.push({
-        id: `bot-${i + 1}`,
+        id: 'bot-1',
         name: botProfile.name,
-        color: otherColors[i],
+        color: botColor,
         type: 'bot',
         avatar: botProfile.avatar,
         isReady: true,
         botDifficulty: botProfile.difficulty,
       });
+    } else {
+      const otherColors = COLOR_ORDER.filter((c) => c !== playerColor);
+      for (let i = 0; i < count; i++) {
+        const botProfile = BOT_PROFILES[i % BOT_PROFILES.length];
+        players.push({
+          id: `bot-${i + 1}`,
+          name: botProfile.name,
+          color: otherColors[i],
+          type: 'bot',
+          avatar: botProfile.avatar,
+          isReady: true,
+          botDifficulty: botProfile.difficulty,
+        });
+      }
     }
   } else if (mode === 'pass_and_play') {
     // Pass and play with 2, 3, or 4 human players ONLY - NEVER ADD BOTS!
@@ -202,6 +223,26 @@ export function createNewGame(
           avatar: p.avatar || defaultAvatars[p.color] || '😎',
           isReady: true,
         });
+      });
+    } else if (count === 2) {
+      // 2 players: assign diagonally opposite corners
+      const p1Color = playerColor;
+      const p2Color = DIAGONAL_OPPOSITE_COLOR[p1Color];
+      players.push({
+        id: 'local-1',
+        name: playerName.trim() || 'Player 1',
+        color: p1Color,
+        type: 'human',
+        avatar: defaultAvatars[p1Color] || '😎',
+        isReady: true,
+      });
+      players.push({
+        id: 'local-2',
+        name: 'Player 2',
+        color: p2Color,
+        type: 'human',
+        avatar: defaultAvatars[p2Color] || '🦁',
+        isReady: true,
       });
     } else {
       players.push({
@@ -296,11 +337,18 @@ export function addPlayerToOnlineRoom(
   if (player.color && !occupiedColors.has(player.color)) {
     assignedColor = player.color;
   } else {
-    const available = COLOR_ORDER.find((c) => !occupiedColors.has(c));
-    if (!available) {
-      return { error: 'No available color seats in room' };
+    // For 2-player online room (when 2nd player joins), assign diagonally opposite corner seat
+    const hostColor = state.players[0]?.color;
+    const diagColor = hostColor ? DIAGONAL_OPPOSITE_COLOR[hostColor] : undefined;
+    if (state.players.length === 1 && diagColor && !occupiedColors.has(diagColor)) {
+      assignedColor = diagColor;
+    } else {
+      const available = COLOR_ORDER.find((c) => !occupiedColors.has(c));
+      if (!available) {
+        return { error: 'No available color seats in room' };
+      }
+      assignedColor = available;
     }
-    assignedColor = available;
   }
 
   const newPlayer: Player = {
