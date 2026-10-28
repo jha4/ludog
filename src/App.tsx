@@ -171,7 +171,12 @@ export default function App() {
       source.addEventListener('state_update', (e) => {
         try {
           const updatedState = JSON.parse(e.data) as GameState;
-          setGameState(updatedState);
+          setGameState((prev) => {
+            if (updatedState.diceValue !== prev.diceValue && updatedState.diceValue !== null) {
+              sounds.playDiceRoll();
+            }
+            return updatedState;
+          });
 
           // If game started, automatically switch from waiting room to game view
           if (updatedState.status === 'playing' && currentView === 'waiting_room') {
@@ -200,6 +205,17 @@ export default function App() {
       return;
     }
 
+    if (gameState.mode === 'online_room') {
+      // Authoritative Server Roll
+      fetch(`/api/rooms/${gameState.id}/roll`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: myPlayerId }),
+      }).catch(() => {});
+      return;
+    }
+
+    // Local Single Player / Pass & Play Roll
     sounds.playDiceRoll();
     setGameState((prev) => ({ ...prev, isRolling: true }));
 
@@ -213,16 +229,12 @@ export default function App() {
         }
         return rolled;
       });
-
-      // Sync with server if online room
-      if (gameState.mode === 'online_room') {
-        fetch(`/api/rooms/${gameState.id}/roll`, { method: 'POST' }).catch(() => {});
-      }
     }, 500);
-  }, [gameState.hasRolled, gameState.isRolling, gameState.status, gameState.id, gameState.mode, isHopping]);
+  }, [gameState.hasRolled, gameState.isRolling, gameState.status, gameState.id, gameState.mode, isHopping, myPlayerId]);
 
   // Delayed Turn Pass when no moves are available
   useEffect(() => {
+    if (gameState.mode === 'online_room') return; // Handled authoritatively by server
     if (gameState.hasRolled && gameState.movableTokenIds.length === 0 && gameState.status === 'playing') {
       const delay = isFastBot ? 600 : 1100;
       passTurnTimerRef.current = setTimeout(() => {
@@ -233,7 +245,7 @@ export default function App() {
         if (passTurnTimerRef.current) clearTimeout(passTurnTimerRef.current);
       };
     }
-  }, [gameState.hasRolled, gameState.movableTokenIds.length, gameState.status, isFastBot]);
+  }, [gameState.hasRolled, gameState.movableTokenIds.length, gameState.status, gameState.mode, isFastBot]);
 
   // Step-by-Step Hopping Move Token Action
   const executeMoveToken = useCallback(
@@ -241,6 +253,17 @@ export default function App() {
       if (!gameState.hasRolled || gameState.diceValue === null || isHopping) return;
       if (!gameState.movableTokenIds.includes(tokenId)) return;
 
+      if (gameState.mode === 'online_room') {
+        // Authoritative Server Move
+        fetch(`/api/rooms/${gameState.id}/move`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tokenId, playerId: myPlayerId }),
+        }).catch(() => {});
+        return;
+      }
+
+      // Local Single Player / Pass & Play Move
       const color = gameState.currentTurn;
       const targetToken = gameState.tokens[color].find((t) => t.id === tokenId);
       if (!targetToken) return;
@@ -258,14 +281,6 @@ export default function App() {
           setIsHopping(false);
           const nextState = moveToken(gameState, tokenId);
           setGameState(nextState);
-
-          if (gameState.mode === 'online_room') {
-            fetch(`/api/rooms/${gameState.id}/move`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tokenId }),
-            }).catch(() => {});
-          }
         }, 260);
         return;
       }
@@ -308,18 +323,10 @@ export default function App() {
           }
 
           setGameState(nextState);
-
-          if (gameState.mode === 'online_room') {
-            fetch(`/api/rooms/${gameState.id}/move`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ tokenId }),
-            }).catch(() => {});
-          }
         }
       }, isFastBot ? 80 : 140);
     },
-    [gameState, isFastBot, isHopping, triggerBotReaction]
+    [gameState, isFastBot, isHopping, myPlayerId, triggerBotReaction]
   );
 
   // Automated Client-Side Bot Loop (Single Player Match)
@@ -347,7 +354,7 @@ export default function App() {
         setTimeout(() => {
           setGameState((prev) => {
             const rolled = rollDice(prev, undefined, false);
-            if (rolled.diceValue === 6 && Math.random() < 0.5) {
+            if (rolled.diceValue === 6 && Math.random() < 0.6) {
               triggerBotReaction(currentP.color, 'roll6');
             }
             if (rolled.lastAction?.type === 'pass') {
@@ -380,6 +387,14 @@ export default function App() {
 
   // Restart Current Round
   const handleRestart = () => {
+    if (gameState.mode === 'online_room') {
+      fetch(`/api/rooms/${gameState.id}/restart`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: myPlayerId }),
+      }).catch(() => {});
+      return;
+    }
     const human = gameState.players.find((p) => p.type === 'human') || gameState.players[0];
     const botCount = gameState.players.filter((p) => p.type === 'bot').length;
     const freshGame = createNewGame(gameState.mode, human.name, human.color, botCount, gameState.id);
@@ -426,6 +441,9 @@ export default function App() {
     setIsLoadingOnline(true);
     setOnlineErrorMessage(null);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const res = await fetch('/api/rooms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -435,19 +453,30 @@ export default function App() {
           playerColor,
           botCount: 0,
         }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        throw new Error('Failed to create online room. Please try again.');
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Server returned an unexpected non-JSON response. Please check server deployment.');
       }
 
-      const initialRoom = (await res.json()) as GameState;
-      setGameState(initialRoom);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || data.message || 'Failed to create online room.');
+      }
+
+      setGameState(data);
       setIsHost(true);
-      setMyPlayerId(initialRoom.players[0].id);
+      setMyPlayerId(data.players[0].id);
       setCurrentView('waiting_room');
     } catch (err: any) {
-      setOnlineErrorMessage(err?.message || 'Error connecting to room server.');
+      if (err.name === 'AbortError') {
+        setOnlineErrorMessage('Room creation timed out. Please check server deployment.');
+      } else {
+        setOnlineErrorMessage(err?.message || 'Error connecting to room server.');
+      }
     } finally {
       setIsLoadingOnline(false);
     }
@@ -458,15 +487,25 @@ export default function App() {
     setIsLoadingOnline(true);
     setOnlineErrorMessage(null);
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const res = await fetch(`/api/rooms/${roomId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerName }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
+
+      const contentType = res.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Room not found or server returned an unexpected response.');
+      }
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || 'Failed to join room.');
+        throw new Error(data.error || data.message || 'Failed to join online room.');
       }
 
       setGameState(data);
@@ -479,7 +518,11 @@ export default function App() {
         setCurrentView('waiting_room');
       }
     } catch (err: any) {
-      setOnlineErrorMessage(err?.message || 'Error joining online room.');
+      if (err.name === 'AbortError') {
+        setOnlineErrorMessage('Join request timed out. Please check room code.');
+      } else {
+        setOnlineErrorMessage(err?.message || 'Error joining online room.');
+      }
     } finally {
       setIsLoadingOnline(false);
     }
@@ -490,11 +533,16 @@ export default function App() {
     try {
       const res = await fetch(`/api/rooms/${gameState.id}/start`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: myPlayerId }),
       });
       if (res.ok) {
         const startedState = (await res.json()) as GameState;
         setGameState(startedState);
         setCurrentView('game');
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Could not start game');
       }
     } catch {}
   };
