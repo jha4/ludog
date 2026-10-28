@@ -112,8 +112,6 @@ export default function App() {
         timestamp: Date.now(),
       };
 
-      setEmojiEvents((prev) => [...prev.slice(-15), newEvent]);
-
       if (gameState.mode === 'online_room') {
         fetch(`/api/rooms/${gameState.id}/emoji`, {
           method: 'POST',
@@ -123,6 +121,8 @@ export default function App() {
           },
           body: JSON.stringify(newEvent),
         }).catch(() => {});
+      } else {
+        setEmojiEvents((prev) => [...prev.slice(-15), newEvent]);
       }
     },
     [gameState.id, gameState.mode, gameState.players, myPlayerId, myPlayerToken]
@@ -230,7 +230,7 @@ export default function App() {
         return rolled;
       });
     }, 500);
-  }, [gameState.hasRolled, gameState.isRolling, gameState.status, gameState.id, gameState.mode, isHopping, myPlayerId]);
+  }, [gameState.hasRolled, gameState.isRolling, gameState.status, gameState.id, gameState.mode, isHopping, myPlayerId, myPlayerToken]);
 
   // Delayed Turn Pass when no moves are available
   useEffect(() => {
@@ -552,6 +552,11 @@ export default function App() {
   const handleTurnTimeout = useCallback(() => {
     if (gameState.status !== 'playing' || isHopping) return;
 
+    if (gameState.mode === 'online_room') {
+      const curP = getCurrentPlayer(gameState);
+      if (curP?.id !== myPlayerId) return;
+    }
+
     if (!gameState.hasRolled && !gameState.isRolling) {
       handleRollDice();
     } else if (gameState.hasRolled && gameState.movableTokenIds.length > 0) {
@@ -561,7 +566,7 @@ export default function App() {
         setGameState((prev) => passTurn(prev));
       }
     }
-  }, [gameState.status, gameState.hasRolled, gameState.isRolling, gameState.movableTokenIds, gameState.mode, isHopping, handleRollDice, executeMoveToken]);
+  }, [gameState, myPlayerId, isHopping, handleRollDice, executeMoveToken]);
 
   const turnKey = `${gameState.currentTurn}-${gameState.hasRolled ? 'rolled' : 'unrolled'}-${gameState.diceValue || 0}-${gameState.history.length}`;
 

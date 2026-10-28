@@ -146,3 +146,31 @@ test('Security & Room Engine - Authoritative Movement & Capture Rules', async ()
   assert.equal(game.tokens.red[0].state, 'track');
   assert.equal(game.tokens.red[0].stepCount, 0); // Red start position
 });
+
+test('Security & Room Engine - Turn Pass on Stuck Roll & Leaver Turn Advancement', async () => {
+  const { passTurn, getNextActivePlayer } = await import('./src/lib/ludoEngine.ts');
+
+  // 1. Stuck roll test
+  let game = createNewGame('online_room', 'Host', 'red', 0, 'ROOM-TEST07');
+  const p2 = addPlayerToOnlineRoom(game, { name: 'Player 2', color: 'blue' });
+  if ('state' in p2) game = p2.state;
+  const started = startOnlineRoomGame(game);
+  assert.equal('error' in started, false);
+  if (!('error' in started)) game = started;
+
+  // Red rolls a 4 with all tokens in base => hasRolled=true, movableTokenIds=[]
+  const rolled4 = rollDice(game, 4);
+  assert.equal(rolled4.hasRolled, true);
+  assert.equal(rolled4.movableTokenIds.length, 0);
+
+  // Passing turn should set currentTurn to blue and reset hasRolled/diceValue
+  const passed = passTurn(rolled4);
+  assert.equal(passed.currentTurn, 'blue');
+  assert.equal(passed.hasRolled, false);
+  assert.equal(passed.diceValue, null);
+
+  // 2. Leaver on turn advancement test
+  const remainingPlayers = game.players.filter((p) => p.color !== 'red'); // Blue remains
+  const nextColor = getNextActivePlayer(remainingPlayers, 'red', game.rankings);
+  assert.equal(nextColor, 'blue');
+});

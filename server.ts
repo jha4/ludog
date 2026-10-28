@@ -7,9 +7,11 @@ import {
   PlayerColor,
   createNewGame,
   rollDice,
+  passTurn,
   moveToken,
   selectBotMove,
   getCurrentPlayer,
+  getNextActivePlayer,
   addPlayerToOnlineRoom,
   startOnlineRoomGame,
   EmojiEvent,
@@ -19,6 +21,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Security Middleware: Body size limits
@@ -92,6 +95,32 @@ interface RoomEntry {
 
 const MAX_ROOMS = 100;
 const rooms = new Map<string, RoomEntry>();
+
+const PASS_DELAY_MS = 1200;
+const passTimers = new Map<string, NodeJS.Timeout>();
+
+function schedulePassIfNoMoves(roomId: string) {
+  const room = rooms.get(roomId);
+  if (!room) return;
+  const s = room.state;
+  const stuck = s.status === 'playing' && s.hasRolled && s.movableTokenIds.length === 0;
+  if (!stuck || passTimers.has(roomId)) return;
+
+  passTimers.set(
+    roomId,
+    setTimeout(() => {
+      passTimers.delete(roomId);
+      const r = rooms.get(roomId);
+      if (!r) return;
+      const cur = r.state;
+      if (cur.status !== 'playing' || !cur.hasRolled || cur.movableTokenIds.length > 0) return;
+      r.state = passTurn(cur);
+      r.lastActive = Date.now();
+      broadcastToRoom(roomId, { type: 'state_update', payload: r.state });
+      scheduleBotTurnIfNeeded(roomId);
+    }, PASS_DELAY_MS)
+  );
+}
 
 // Room Code Format Regex (ROOM-XXXXXX)
 const ROOM_CODE_REGEX = /^ROOM-[A-Z0-9]{4,12}$/i;
@@ -197,6 +226,8 @@ function scheduleBotTurnIfNeeded(roomId: string) {
   const room = rooms.get(roomId);
   if (!room || room.state.status !== 'playing') return;
 
+  schedulePassIfNoMoves(roomId);
+
   const currentPlayer = getCurrentPlayer(room.state);
   if (!currentPlayer || currentPlayer.type !== 'bot') {
     if (room.botTimer) {
@@ -297,6 +328,11 @@ setInterval(() => {
     // Cleanup if room has no SSE clients and inactive for over 30 minutes
     if (room.clients.size === 0 && now - room.lastActive > 30 * 60 * 1000) {
       if (room.botTimer) clearTimeout(room.botTimer);
+      const passT = passTimers.get(id);
+      if (passT) {
+        clearTimeout(passT);
+        passTimers.delete(id);
+      }
       rooms.delete(id);
     }
   }
@@ -573,9 +609,16 @@ app.post('/api/rooms/:roomId/leave', (req: Request, res: Response) => {
     room.playerSessions.delete(token);
   }
 
+  const leaver = room.state.players.find((p) => p.id === targetPlayerId);
   const remainingPlayers = room.state.players.filter((p) => p.id !== targetPlayerId);
+
   if (remainingPlayers.length === 0) {
     if (room.botTimer) clearTimeout(room.botTimer);
+    const passT = passTimers.get(roomId);
+    if (passT) {
+      clearTimeout(passT);
+      passTimers.delete(roomId);
+    }
     rooms.delete(roomId);
     return res.json({ success: true, roomClosed: true });
   }
@@ -590,17 +633,33 @@ app.post('/api/rooms/:roomId/leave', (req: Request, res: Response) => {
     }
   }
 
+  const isLeaverTurn = leaver && room.state.currentTurn === leaver.color;
+  const nextTurnColor = isLeaverTurn
+    ? getNextActivePlayer(remainingPlayers, leaver.color, room.state.rankings)
+    : remainingPlayers.some((p) => p.color === room.state.currentTurn)
+    ? room.state.currentTurn
+    : remainingPlayers[0].color;
+
+  const leaverName = leaver ? leaver.name : 'A player';
+
   room.state = {
     ...room.state,
     players: remainingPlayers,
     status: remainingPlayers.length < 2 && room.state.status === 'playing' ? 'waiting' : room.state.status,
-    currentTurn: remainingPlayers.some((p) => p.color === room.state.currentTurn)
-      ? room.state.currentTurn
-      : remainingPlayers[0].color,
-    history: [`A player left the room.`, ...room.state.history.slice(0, 19)],
+    currentTurn: nextTurnColor,
+    ...(isLeaverTurn
+      ? {
+          hasRolled: false,
+          diceValue: null,
+          movableTokenIds: [],
+          consecutiveSixes: 0,
+        }
+      : {}),
+    history: [`${leaverName} left the room.`, ...room.state.history.slice(0, 19)],
   };
   room.lastActive = Date.now();
   broadcastToRoom(roomId, { type: 'state_update', payload: room.state });
+  scheduleBotTurnIfNeeded(roomId);
   res.json({ success: true, state: room.state });
 });
 
