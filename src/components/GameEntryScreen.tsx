@@ -58,9 +58,9 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
   const [passPlayCount, setPassPlayCount] = useState<number>(4);
   const [passPlayNames, setPassPlayNames] = useState<Record<PlayerColor, string>>({
     red: 'Player 1',
-    blue: 'Player 2',
+    green: 'Player 2',
     yellow: 'Player 3',
-    green: 'Player 4',
+    blue: 'Player 4',
   });
 
   // Online Room tab
@@ -68,7 +68,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
   const [roomCodeInput, setRoomCodeInput] = useState<string>('');
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  const colors: PlayerColor[] = ['red', 'blue', 'yellow', 'green'];
+  const colors: PlayerColor[] = ['red', 'green', 'yellow', 'blue'];
 
   const handleModeSelect = (mode: GameMode) => {
     sounds.playClick();
@@ -514,8 +514,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
                     maxLength={10}
                     onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
                     placeholder="e.g. ROOM-1234"
-                    style={{ width: '180.8px' }}
-                    className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm sm:text-base font-mono font-bold tracking-widest text-amber-400 uppercase placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm sm:text-base font-mono font-bold tracking-widest text-amber-400 uppercase placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
                   />
                 </div>
               )}

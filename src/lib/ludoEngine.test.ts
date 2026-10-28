@@ -27,8 +27,8 @@ test('rolling a non-6 with all tokens in base allows no moves and passes turn', 
   game = rollDice(game, 3, true);
   assert.equal(game.lastAction?.value, 3);
   assert.equal(game.movableTokenIds.length, 0);
-  // Turn should have automatically passed to next player (blue)
-  assert.equal(game.currentTurn, 'blue');
+  // Turn should have automatically passed to next player (green)
+  assert.equal(game.currentTurn, 'green');
   assert.equal(game.hasRolled, false);
 });
 
@@ -62,19 +62,19 @@ test('token moves forward along track by dice roll', () => {
 
   assert.equal(game.tokens.red[0].stepCount, 4);
   assert.equal(getTrackPosition('red', 4), 4);
-  // Since it was not a 6 or capture, turn passes to blue
-  assert.equal(game.currentTurn, 'blue');
+  // Since it was not a 6 or capture, turn passes to green
+  assert.equal(game.currentTurn, 'green');
 });
 
 test('token captures opponent on non-safe square and sends it back to base', () => {
   let game = createNewGame('single_player', 'Alice', 'red', 3);
-  // Put red token 0 on track position 10 (step 10 for red)
+  // Put red token 0 on track position 6 (step 6 for red)
   game.tokens.red[0].state = 'track';
   game.tokens.red[0].stepCount = 6; // red track pos: 6
 
-  // Put green/blue token 0 on track position 10 (blue start is 13; track pos 10 is (13 + 49) % 52)
-  game.tokens.blue[0].state = 'track';
-  game.tokens.blue[0].stepCount = 49; // track pos: (13 + 49) % 52 = 62 % 52 = 10
+  // Put green token 0 on track position 10 (green start is 13; track pos 10 is (13 + 49) % 52 = 10)
+  game.tokens.green[0].state = 'track';
+  game.tokens.green[0].stepCount = 49;
 
   // Verify track positions
   assert.equal(getTrackPosition('red', 10), 10);
@@ -88,9 +88,9 @@ test('token captures opponent on non-safe square and sends it back to base', () 
 
   game = moveToken(game, 0);
   assert.equal(game.tokens.red[0].stepCount, 10);
-  // Blue token 0 should have been captured and returned to base!
-  assert.equal(game.tokens.blue[0].state, 'base');
-  assert.equal(game.tokens.blue[0].stepCount, -1);
+  // Green token 0 should have been captured and returned to base!
+  assert.equal(game.tokens.green[0].state, 'base');
+  assert.equal(game.tokens.green[0].stepCount, -1);
   // Red gets a bonus roll for capturing!
   assert.equal(game.currentTurn, 'red');
 });
@@ -104,11 +104,11 @@ test('safe star square protects token from capture', () => {
   game.tokens.red[0].state = 'track';
   game.tokens.red[0].stepCount = 4;
 
-  // Put blue token on safe spot 8
-  // Blue start is 13, so 8 is (13 + 47) % 52 = 60 % 52 = 8
-  game.tokens.blue[0].state = 'track';
-  game.tokens.blue[0].stepCount = 47;
-  assert.equal(getTrackPosition('blue', 47), 8);
+  // Put green token on safe spot 8
+  // Green start is 13, so 8 is (13 + 47) % 52 = 60 % 52 = 8
+  game.tokens.green[0].state = 'track';
+  game.tokens.green[0].stepCount = 47;
+  assert.equal(getTrackPosition('green', 47), 8);
 
   // Red rolls 4 and lands on safe spot 8
   game.currentTurn = 'red';
@@ -116,9 +116,9 @@ test('safe star square protects token from capture', () => {
   game = rollDice(game, 4);
   game = moveToken(game, 0);
 
-  // Blue token must NOT be captured because 8 is a safe star
-  assert.equal(game.tokens.blue[0].state, 'track');
-  assert.equal(game.tokens.blue[0].stepCount, 47);
+  // Green token must NOT be captured because 8 is a safe star
+  assert.equal(game.tokens.green[0].state, 'track');
+  assert.equal(game.tokens.green[0].stepCount, 47);
 });
 
 test('exact roll required to enter home', () => {
@@ -148,19 +148,19 @@ test('exact roll required to enter home', () => {
 
 test('bot AI prioritizes capturing opponent piece', () => {
   let game = createNewGame('single_player', 'Alice', 'red', 3);
-  game.currentTurn = 'blue';
+  game.currentTurn = 'green';
   game.diceValue = 3;
 
   // Token 0 can capture red token
-  // Blue start offset is 13: step 4 -> (13 + 4) = 17, landing on 20
-  game.tokens.blue[0].state = 'track';
-  game.tokens.blue[0].stepCount = 4;
+  // Green start offset is 13: step 4 -> (13 + 4) = 17, landing on 20
+  game.tokens.green[0].state = 'track';
+  game.tokens.green[0].stepCount = 4;
   game.tokens.red[0].state = 'track';
   game.tokens.red[0].stepCount = 20; // pos 20 (not safe)
 
   // Token 1 is just wandering with no capture
-  game.tokens.blue[1].state = 'track';
-  game.tokens.blue[1].stepCount = 30;
+  game.tokens.green[1].state = 'track';
+  game.tokens.green[1].stepCount = 30;
 
   game.movableTokenIds = [0, 1];
   const chosenToken = selectBotMove(game);
@@ -192,7 +192,7 @@ test('pass_and_play creates exactly the configured human players and zero bots',
     playerCount: 3,
     players: [
       { name: 'P1 Red', color: 'red' },
-      { name: 'P2 Blue', color: 'blue' },
+      { name: 'P2 Green', color: 'green' },
       { name: 'P3 Yellow', color: 'yellow' },
     ],
   });
@@ -201,7 +201,7 @@ test('pass_and_play creates exactly the configured human players and zero bots',
   assert.equal(game.players.every((p) => p.type === 'human'), true);
   assert.equal(game.players.some((p) => p.type === 'bot'), false);
   assert.equal(game.players[0].name, 'P1 Red');
-  assert.equal(game.players[1].name, 'P2 Blue');
+  assert.equal(game.players[1].name, 'P2 Green');
   assert.equal(game.players[2].name, 'P3 Yellow');
 });
 
@@ -215,16 +215,16 @@ test('online_room creates 1 human host, 0 bots, and status waiting', () => {
 test('addPlayerToOnlineRoom assigns available color and blocks 5th player', () => {
   let game = createNewGame('online_room', 'Host', 'red', 0, 'ROOM-888');
 
-  // Add 2nd player
+  // Add 2nd player (assigned green as next in clockwise order)
   const res2 = addPlayerToOnlineRoom(game, { name: 'Player 2' });
   assert.equal('error' in res2, false);
   if (!('error' in res2)) {
     game = res2.state;
-    assert.equal(res2.player.color, 'blue');
+    assert.equal(res2.player.color, 'green');
     assert.equal(game.players.length, 2);
   }
 
-  // Add 3rd player
+  // Add 3rd player (assigned yellow)
   const res3 = addPlayerToOnlineRoom(game, { name: 'Player 3' });
   assert.equal('error' in res3, false);
   if (!('error' in res3)) {
@@ -233,12 +233,12 @@ test('addPlayerToOnlineRoom assigns available color and blocks 5th player', () =
     assert.equal(game.players.length, 3);
   }
 
-  // Add 4th player
+  // Add 4th player (assigned blue)
   const res4 = addPlayerToOnlineRoom(game, { name: 'Player 4' });
   assert.equal('error' in res4, false);
   if (!('error' in res4)) {
     game = res4.state;
-    assert.equal(res4.player.color, 'green');
+    assert.equal(res4.player.color, 'blue');
     assert.equal(game.players.length, 4);
   }
 
@@ -273,8 +273,8 @@ test('three consecutive sixes penalizes and passes turn to next player', () => {
   game = rollDice(game, 6);
   game = moveToken(game, 0); // consecutiveSixes = 2
 
-  // Third 6 -> turn penalty, passes turn to blue!
+  // Third 6 -> turn penalty, passes turn to green!
   game = rollDice(game, 6);
   assert.equal(game.consecutiveSixes, 0);
-  assert.equal(game.currentTurn, 'blue');
+  assert.equal(game.currentTurn, 'green');
 });

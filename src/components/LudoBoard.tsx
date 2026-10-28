@@ -69,85 +69,10 @@ const StaticLudoGrid = React.memo<StaticLudoGridProps>(({
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-800 shadow-inner grid grid-cols-15 grid-rows-15">
       {/* ================= 4 BASE QUADRANTS ================= */}
-      {/* Top-Left: Green Base (Rows 0-5, Cols 0-5) */}
-      <div
-        onClick={() => onBaseClick('green')}
-        className={`col-start-1 col-end-7 row-start-1 row-end-7 p-2 bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-900 border-r-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-          !isGreenActive ? 'opacity-30 grayscale-[60%]' : ''
-        } ${
-          isGreenActive && currentTurn === 'green' && baseTokensMovable ? 'cursor-pointer ring-4 ring-emerald-300 ring-inset animate-pulse' : ''
-        }`}
-      >
-        <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
-          <span className="flex items-center gap-1.5 font-fredoka">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-300 shadow-xs inline-block" />
-            GREEN {!isGreenActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
-          </span>
-          {isGreenActive && <Crown className="w-3.5 h-3.5 text-emerald-200" />}
-        </div>
-
-        {/* Inset white tray containing the 4 circular pits */}
-        <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-slate-100 shadow-lg border-2 border-emerald-900/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
-          {[0, 1, 2, 3].map((idx) => (
-            <div
-              key={idx}
-              className="w-full h-full rounded-full bg-gradient-to-br from-emerald-100 to-emerald-200 border-2 border-emerald-600/70 flex items-center justify-center shadow-inner relative"
-            >
-              <div className="w-3.5 h-3.5 rounded-full bg-emerald-600/30 border border-emerald-600/40 shadow-xs" />
-            </div>
-          ))}
-        </div>
-
-        {isGreenActive && currentTurn === 'green' && baseTokensMovable && (
-          <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
-              <Rocket className="w-2.5 h-2.5" /> DEPLOY
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Top-Right: Yellow Base (Rows 0-5, Cols 10-15) */}
-      <div
-        onClick={() => onBaseClick('yellow')}
-        className={`col-start-10 col-end-16 row-start-1 row-end-7 p-2 bg-gradient-to-br from-amber-500 via-amber-600 to-amber-800 border-l-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
-          !isYellowActive ? 'opacity-30 grayscale-[60%]' : ''
-        } ${
-          isYellowActive && currentTurn === 'yellow' && baseTokensMovable ? 'cursor-pointer ring-4 ring-amber-300 ring-inset animate-pulse' : ''
-        }`}
-      >
-        <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
-          <span className="flex items-center gap-1.5 font-fredoka">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-200 shadow-xs inline-block" />
-            YELLOW {!isYellowActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
-          </span>
-          {isYellowActive && <Crown className="w-3.5 h-3.5 text-amber-200" />}
-        </div>
-
-        <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-slate-100 shadow-lg border-2 border-amber-900/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
-          {[0, 1, 2, 3].map((idx) => (
-            <div
-              key={idx}
-              className="w-full h-full rounded-full bg-gradient-to-br from-amber-100 to-amber-200 border-2 border-amber-600/70 flex items-center justify-center shadow-inner relative"
-            >
-              <div className="w-3.5 h-3.5 rounded-full bg-amber-600/30 border border-amber-600/40 shadow-xs" />
-            </div>
-          ))}
-        </div>
-
-        {isYellowActive && currentTurn === 'yellow' && baseTokensMovable && (
-          <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
-            <span className="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
-              <Rocket className="w-2.5 h-2.5" /> DEPLOY
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom-Left: Red Base (Rows 10-15, Cols 0-5) */}
+      {/* Top-Left: RED Base (Rows 0-5, Cols 0-5) */}
       <div
         onClick={() => onBaseClick('red')}
-        className={`col-start-1 col-end-7 row-start-10 row-end-16 p-2 bg-gradient-to-br from-rose-600 via-rose-700 to-rose-900 border-r-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
+        className={`col-start-1 col-end-7 row-start-1 row-end-7 p-2 bg-gradient-to-br from-rose-600 via-rose-700 to-rose-900 border-r-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
           !isRedActive ? 'opacity-30 grayscale-[60%]' : ''
         } ${
           isRedActive && currentTurn === 'red' && baseTokensMovable ? 'cursor-pointer ring-4 ring-rose-300 ring-inset animate-pulse' : ''
@@ -161,6 +86,7 @@ const StaticLudoGrid = React.memo<StaticLudoGridProps>(({
           {isRedActive && <Crown className="w-3.5 h-3.5 text-rose-200" />}
         </div>
 
+        {/* Inset white tray containing the 4 circular pits */}
         <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-slate-100 shadow-lg border-2 border-rose-900/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
           {[0, 1, 2, 3].map((idx) => (
             <div
@@ -181,10 +107,47 @@ const StaticLudoGrid = React.memo<StaticLudoGridProps>(({
         )}
       </div>
 
-      {/* Bottom-Right: Blue Base (Rows 10-15, Cols 10-15) */}
+      {/* Top-Right: GREEN Base (Rows 0-5, Cols 10-15) */}
+      <div
+        onClick={() => onBaseClick('green')}
+        className={`col-start-10 col-end-16 row-start-1 row-end-7 p-2 bg-gradient-to-br from-emerald-600 via-emerald-700 to-emerald-900 border-l-2 border-b-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
+          !isGreenActive ? 'opacity-30 grayscale-[60%]' : ''
+        } ${
+          isGreenActive && currentTurn === 'green' && baseTokensMovable ? 'cursor-pointer ring-4 ring-emerald-300 ring-inset animate-pulse' : ''
+        }`}
+      >
+        <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
+          <span className="flex items-center gap-1.5 font-fredoka">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-300 shadow-xs inline-block" />
+            GREEN {!isGreenActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
+          </span>
+          {isGreenActive && <Crown className="w-3.5 h-3.5 text-emerald-200" />}
+        </div>
+
+        <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-slate-100 shadow-lg border-2 border-emerald-900/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
+          {[0, 1, 2, 3].map((idx) => (
+            <div
+              key={idx}
+              className="w-full h-full rounded-full bg-gradient-to-br from-emerald-100 to-emerald-200 border-2 border-emerald-600/70 flex items-center justify-center shadow-inner relative"
+            >
+              <div className="w-3.5 h-3.5 rounded-full bg-emerald-600/30 border border-emerald-600/40 shadow-xs" />
+            </div>
+          ))}
+        </div>
+
+        {isGreenActive && currentTurn === 'green' && baseTokensMovable && (
+          <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
+              <Rocket className="w-2.5 h-2.5" /> DEPLOY
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom-Left: BLUE Base (Rows 10-15, Cols 0-5) */}
       <div
         onClick={() => onBaseClick('blue')}
-        className={`col-start-10 col-end-16 row-start-10 row-end-16 p-2 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 border-l-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
+        className={`col-start-1 col-end-7 row-start-10 row-end-16 p-2 bg-gradient-to-br from-blue-600 via-blue-700 to-blue-900 border-r-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
           !isBlueActive ? 'opacity-30 grayscale-[60%]' : ''
         } ${
           isBlueActive && currentTurn === 'blue' && baseTokensMovable ? 'cursor-pointer ring-4 ring-blue-300 ring-inset animate-pulse' : ''
@@ -218,13 +181,50 @@ const StaticLudoGrid = React.memo<StaticLudoGridProps>(({
         )}
       </div>
 
+      {/* Bottom-Right: YELLOW Base (Rows 10-15, Cols 10-15) */}
+      <div
+        onClick={() => onBaseClick('yellow')}
+        className={`col-start-10 col-end-16 row-start-10 row-end-16 p-2 bg-gradient-to-br from-amber-500 via-amber-600 to-amber-800 border-l-2 border-t-2 border-slate-950 relative flex flex-col justify-between shadow-lg transition-all ${
+          !isYellowActive ? 'opacity-30 grayscale-[60%]' : ''
+        } ${
+          isYellowActive && currentTurn === 'yellow' && baseTokensMovable ? 'cursor-pointer ring-4 ring-amber-300 ring-inset animate-pulse' : ''
+        }`}
+      >
+        <div className="flex items-center justify-between text-white/95 font-black text-[11px] sm:text-xs">
+          <span className="flex items-center gap-1.5 font-fredoka">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-200 shadow-xs inline-block" />
+            YELLOW {!isYellowActive && <span className="text-[9px] font-normal opacity-70">(Empty)</span>}
+          </span>
+          {isYellowActive && <Crown className="w-3.5 h-3.5 text-amber-200" />}
+        </div>
+
+        <div className="absolute inset-0 m-auto w-[68%] h-[68%] rounded-2xl bg-slate-100 shadow-lg border-2 border-amber-900/40 grid grid-cols-2 grid-rows-2 p-2 gap-2">
+          {[0, 1, 2, 3].map((idx) => (
+            <div
+              key={idx}
+              className="w-full h-full rounded-full bg-gradient-to-br from-amber-100 to-amber-200 border-2 border-amber-600/70 flex items-center justify-center shadow-inner relative"
+            >
+              <div className="w-3.5 h-3.5 rounded-full bg-amber-600/30 border border-amber-600/40 shadow-xs" />
+            </div>
+          ))}
+        </div>
+
+        {isYellowActive && currentTurn === 'yellow' && baseTokensMovable && (
+          <div className="absolute inset-x-2 bottom-2 z-20 flex justify-center pointer-events-none">
+            <span className="px-2.5 py-0.5 rounded-full bg-amber-300 text-slate-950 font-black text-[9px] shadow-lg flex items-center gap-1 animate-bounce">
+              <Rocket className="w-2.5 h-2.5" /> DEPLOY
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* ================= 52 COMMON TRACK CELLS ================= */}
       {TRACK_GRID_COORDS.map((coord, idx) => {
         const isSafe = SAFE_TRACK_POSITIONS.has(idx);
         const isRedStart = idx === 0;
-        const isBlueStart = idx === 13;
+        const isGreenStart = idx === 13;
         const isYellowStart = idx === 26;
-        const isGreenStart = idx === 39;
+        const isBlueStart = idx === 39;
 
         let cellBg = 'bg-slate-800/90';
         let borderHighlight = 'border-slate-950/70';
@@ -232,15 +232,15 @@ const StaticLudoGrid = React.memo<StaticLudoGridProps>(({
         if (isRedStart) {
           cellBg = 'bg-gradient-to-br from-rose-500 to-rose-600 text-white';
           borderHighlight = 'border-rose-950';
-        } else if (isBlueStart) {
-          cellBg = 'bg-gradient-to-br from-blue-500 to-blue-600 text-white';
-          borderHighlight = 'border-blue-950';
-        } else if (isYellowStart) {
-          cellBg = 'bg-gradient-to-br from-amber-400 to-amber-500 text-white';
-          borderHighlight = 'border-amber-950';
         } else if (isGreenStart) {
           cellBg = 'bg-gradient-to-br from-emerald-500 to-emerald-600 text-white';
           borderHighlight = 'border-emerald-950';
+        } else if (isYellowStart) {
+          cellBg = 'bg-gradient-to-br from-amber-400 to-amber-500 text-white';
+          borderHighlight = 'border-amber-950';
+        } else if (isBlueStart) {
+          cellBg = 'bg-gradient-to-br from-blue-500 to-blue-600 text-white';
+          borderHighlight = 'border-blue-950';
         }
 
         return (

@@ -68,9 +68,9 @@ export interface EmojiEvent {
 // Track starting offsets for each color in the 52-tile track
 export const COLOR_START_OFFSETS: Record<PlayerColor, number> = {
   red: 0,
-  blue: 13,
+  green: 13,
   yellow: 26,
-  green: 39,
+  blue: 39,
 };
 
 // Safe spots (0-indexed common track positions)
@@ -78,15 +78,15 @@ export const COLOR_START_OFFSETS: Record<PlayerColor, number> = {
 export const SAFE_TRACK_POSITIONS = new Set<number>([
   0,  // Red Start
   8,  // Red sector safe star
-  13, // Blue Start
-  21, // Blue sector safe star
+  13, // Green Start
+  21, // Green sector safe star
   26, // Yellow Start
   34, // Yellow sector safe star
-  39, // Green Start
-  47, // Green sector safe star
+  39, // Blue Start
+  47, // Blue sector safe star
 ]);
 
-export const COLOR_ORDER: PlayerColor[] = ['red', 'blue', 'yellow', 'green'];
+export const COLOR_ORDER: PlayerColor[] = ['red', 'green', 'yellow', 'blue'];
 
 export const COLOR_HEX: Record<PlayerColor, { primary: string; light: string; dark: string; border: string; bg: string }> = {
   red: {

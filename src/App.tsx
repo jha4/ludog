@@ -562,7 +562,7 @@ export default function App() {
     }
   }, [gameState.status, gameState.hasRolled, gameState.isRolling, gameState.movableTokenIds, gameState.mode, isHopping, handleRollDice, executeMoveToken]);
 
-  const turnKey = `${gameState.currentTurn}-${gameState.hasRolled ? 'rolled' : 'unrolled'}-${gameState.diceValue || 0}-${gameState.turnCount}`;
+  const turnKey = `${gameState.currentTurn}-${gameState.hasRolled ? 'rolled' : 'unrolled'}-${gameState.diceValue || 0}-${gameState.history.length}`;
 
   // Turn status calculations
   const currentPlayer = getCurrentPlayer(gameState);
@@ -702,12 +702,29 @@ export default function App() {
 
         {/* ================= TOP PLAYER STATIONS ================= */}
         <div className="grid grid-cols-2 gap-2">
+          {redPlayer ? (
+            <PlayerCard
+              player={redPlayer}
+              isCurrentTurn={gameState.currentTurn === 'red'}
+              tokens={gameState.tokens.red}
+              position="top-left"
+              isRankedWinner={gameState.rankings.includes('red')}
+              turnDurationSeconds={15}
+              turnKey={turnKey}
+              onTurnTimeout={handleTurnTimeout}
+            />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
+              Empty Red Seat
+            </div>
+          )}
+
           {greenPlayer ? (
             <PlayerCard
               player={greenPlayer}
               isCurrentTurn={gameState.currentTurn === 'green'}
               tokens={gameState.tokens.green}
-              position="top-left"
+              position="top-right"
               isRankedWinner={gameState.rankings.includes('green')}
               turnDurationSeconds={15}
               turnKey={turnKey}
@@ -716,23 +733,6 @@ export default function App() {
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
               Empty Green Seat
-            </div>
-          )}
-
-          {yellowPlayer ? (
-            <PlayerCard
-              player={yellowPlayer}
-              isCurrentTurn={gameState.currentTurn === 'yellow'}
-              tokens={gameState.tokens.yellow}
-              position="top-right"
-              isRankedWinner={gameState.rankings.includes('yellow')}
-              turnDurationSeconds={15}
-              turnKey={turnKey}
-              onTurnTimeout={handleTurnTimeout}
-            />
-          ) : (
-            <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
-              Empty Yellow Seat
             </div>
           )}
         </div>
@@ -750,24 +750,24 @@ export default function App() {
 
         {/* ================= BOTTOM PLAYER STATIONS & CENTRAL ROLL DICE ================= */}
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-          {redPlayer ? (
+          {bluePlayer ? (
             <PlayerCard
-              player={redPlayer}
-              isCurrentTurn={gameState.currentTurn === 'red'}
-              tokens={gameState.tokens.red}
+              player={bluePlayer}
+              isCurrentTurn={gameState.currentTurn === 'blue'}
+              tokens={gameState.tokens.blue}
               position="bottom-left"
-              isRankedWinner={gameState.rankings.includes('red')}
+              isRankedWinner={gameState.rankings.includes('blue')}
               turnDurationSeconds={15}
               turnKey={turnKey}
               onTurnTimeout={handleTurnTimeout}
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
-              Empty Red
+              Empty Blue
             </div>
           )}
 
-          {/* Central Dice Control in middle between Commander and Blitz Bot */}
+          {/* Central Dice Control in middle between bottom player stations */}
           {currentPlayer && (
             <SharedDiceControl
               gameState={gameState}
@@ -779,20 +779,20 @@ export default function App() {
             />
           )}
 
-          {bluePlayer ? (
+          {yellowPlayer ? (
             <PlayerCard
-              player={bluePlayer}
-              isCurrentTurn={gameState.currentTurn === 'blue'}
-              tokens={gameState.tokens.blue}
+              player={yellowPlayer}
+              isCurrentTurn={gameState.currentTurn === 'yellow'}
+              tokens={gameState.tokens.yellow}
               position="bottom-right"
-              isRankedWinner={gameState.rankings.includes('blue')}
+              isRankedWinner={gameState.rankings.includes('yellow')}
               turnDurationSeconds={15}
               turnKey={turnKey}
               onTurnTimeout={handleTurnTimeout}
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
-              Empty Blue
+              Empty Yellow
             </div>
           )}
         </div>

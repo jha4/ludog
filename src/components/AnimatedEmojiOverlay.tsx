@@ -97,9 +97,10 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="w-full max-w-[360px] sm:max-w-sm rounded-3xl bg-slate-900 border border-slate-700 p-4 sm:p-5 shadow-2xl text-slate-100 flex flex-col gap-3.5 sm:gap-4 max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-[360px] sm:max-w-sm rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl text-slate-100 flex flex-col max-h-[85vh] overflow-hidden"
             >
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 pb-3 shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
                     <Sparkles className="w-5 h-5" />
@@ -111,76 +112,92 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white shrink-0 ml-1"
+                  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white shrink-0 ml-1 cursor-pointer transition"
+                  title="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              {/* Emoji Grid */}
-              <div>
-                <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                  Animated Emojis
-                </span>
-                <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                  {QUICK_EMOJIS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => setSelectedEmoji(emoji)}
-                      className={`h-10 sm:h-12 flex items-center justify-center rounded-2xl text-xl sm:text-2xl border transition-all cursor-pointer ${
-                        selectedEmoji === emoji
-                          ? 'bg-amber-500/30 border-amber-400 scale-105 shadow-md shadow-amber-500/20'
-                          : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
+              {/* Scrollable Body */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-3.5 flex flex-col gap-3.5 sm:gap-4">
+                {/* Emoji Grid */}
+                <div>
+                  <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                    Animated Emojis
+                  </span>
+                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
+                    {QUICK_EMOJIS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        onClick={() => setSelectedEmoji(emoji)}
+                        className={`h-10 sm:h-12 flex items-center justify-center rounded-2xl text-xl sm:text-2xl border transition-all cursor-pointer ${
+                          selectedEmoji === emoji
+                            ? 'bg-amber-500/30 border-amber-400 scale-105 shadow-md shadow-amber-500/20'
+                            : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
+                        }`}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Quick Chat Shoutouts */}
+                <div>
+                  <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                    Quick Shoutouts
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                    {QUICK_MESSAGES.map((msg) => (
+                      <button
+                        key={msg}
+                        type="button"
+                        onClick={() => handleSend(selectedEmoji, msg)}
+                        className="px-2.5 sm:px-3 py-2 text-xs font-medium rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700 text-slate-200 text-left transition-all hover:border-slate-500 truncate cursor-pointer active:scale-98"
+                      >
+                        {msg}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
-              {/* Quick Chat Shoutouts */}
-              <div>
-                <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                  Quick Shoutouts
-                </span>
-                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                  {QUICK_MESSAGES.map((msg) => (
-                    <button
-                      key={msg}
-                      onClick={() => handleSend(selectedEmoji, msg)}
-                      className="px-2.5 sm:px-3 py-2 text-xs font-medium rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700 text-slate-200 text-left transition-all hover:border-slate-500 truncate"
-                    >
-                      {msg}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Custom Message Input */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-800 w-full">
-                <div className="text-xl sm:text-2xl p-1.5 sm:p-2 rounded-xl bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center">
-                  {selectedEmoji}
-                </div>
-                <input
-                  type="text"
-                  value={customText}
-                  onChange={(e) => setCustomText(e.target.value)}
-                  placeholder="Type a reaction..."
-                  maxLength={40}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && (customText.trim() || selectedEmoji)) {
+              {/* Fixed Footer Custom Message Input */}
+              <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (customText.trim() || selectedEmoji) {
                       handleSend(selectedEmoji, customText.trim() || undefined);
                     }
                   }}
-                  className="flex-1 min-w-0 rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                />
-                <button
-                  onClick={() => handleSend(selectedEmoji, customText.trim() || undefined)}
-                  className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold transition-all shadow-md shadow-amber-500/30 cursor-pointer shrink-0 flex items-center justify-center"
+                  className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-950/80 border border-slate-700 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400/50 transition-all w-full box-border"
                 >
-                  <Send className="w-4 h-4" />
-                </button>
+                  <div 
+                    className="w-9 h-9 shrink-0 flex items-center justify-center text-xl rounded-xl bg-slate-800/90 border border-slate-700/80 select-none"
+                    title={`Selected: ${selectedEmoji}`}
+                  >
+                    {selectedEmoji}
+                  </div>
+                  <input
+                    type="text"
+                    value={customText}
+                    onChange={(e) => setCustomText(e.target.value)}
+                    placeholder="Type a reaction..."
+                    maxLength={40}
+                    className="flex-1 min-w-0 bg-transparent px-2.5 py-1.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={disabled}
+                    className="w-9 h-9 shrink-0 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold transition-all shadow-md shadow-amber-500/25 cursor-pointer flex items-center justify-center disabled:opacity-40"
+                    title="Send reaction"
+                  >
+                    <Send className="w-4 h-4 text-slate-950" />
+                  </button>
+                </form>
               </div>
             </motion.div>
           </div>
