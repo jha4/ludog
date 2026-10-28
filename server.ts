@@ -320,6 +320,14 @@ app.get('/api/health', (req: Request, res: Response) => {
   });
 });
 
+// Normalize roomId param across all room routes (ensures consistent case-insensitive lookup)
+app.param('roomId', (req: Request, _res: Response, next: NextFunction, val: string) => {
+  if (typeof val === 'string') {
+    req.params.roomId = val.trim().toUpperCase();
+  }
+  next();
+});
+
 // List active rooms
 app.get('/api/rooms', (req: Request, res: Response) => {
   const clientIp = req.ip || 'unknown';

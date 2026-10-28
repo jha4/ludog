@@ -5,11 +5,46 @@ import { createNewGame, rollDice, moveToken, addPlayerToOnlineRoom, startOnlineR
 test('Security & Room Engine - Cryptographic Room Code Format & Validation', async () => {
   const ROOM_CODE_REGEX = /^ROOM-[A-Z0-9]{4,12}$/i;
 
+  // Exact bug test case: ROOM-VBQ62M (11 characters)
+  const targetCode = 'ROOM-VBQ62M';
+  assert.equal(targetCode.length, 11);
+  assert.equal(ROOM_CODE_REGEX.test(targetCode), true);
+
+  // Other valid room codes with different final characters
+  assert.equal(ROOM_CODE_REGEX.test('ROOM-VBQ62Z'), true);
+  assert.equal(ROOM_CODE_REGEX.test('ROOM-VBQ627'), true);
   assert.equal(ROOM_CODE_REGEX.test('ROOM-X7K2M9'), true);
   assert.equal(ROOM_CODE_REGEX.test('ROOM-ABCD'), true);
+
+  // Normalization logic (case insensitivity & auto-prefixing suffix when pasting)
+  const normalizeInput = (raw: string) => {
+    const trimmed = raw.trim().toUpperCase();
+    return trimmed.startsWith('ROOM-') ? trimmed : `ROOM-${trimmed}`;
+  };
+  assert.equal(normalizeInput('room-vbq62m'), 'ROOM-VBQ62M');
+  assert.equal(normalizeInput('VBQ62M'), 'ROOM-VBQ62M');
+  assert.equal(normalizeInput('ROOM-VBQ62M'), 'ROOM-VBQ62M');
+
+  // Invalid formats
   assert.equal(ROOM_CODE_REGEX.test('INVALID-ROOM'), false);
   assert.equal(ROOM_CODE_REGEX.test('ROOM-'), false);
   assert.equal(ROOM_CODE_REGEX.test('ROOM-???123'), false);
+  assert.equal(ROOM_CODE_REGEX.test(''), false);
+});
+
+test('Security & Room Engine - Full 11-character Room Code Preservation in Game State', async () => {
+  const roomCode = 'ROOM-VBQ62M';
+  const game = createNewGame('online_room', 'Host', 'red', 0, roomCode);
+  assert.equal(game.id, 'ROOM-VBQ62M');
+  assert.equal(game.id.length, 11);
+
+  // Joining player retains exact full room id
+  const joinResult = addPlayerToOnlineRoom(game, { name: 'Player 2', color: 'blue' });
+  assert.equal('state' in joinResult, true);
+  if ('state' in joinResult) {
+    assert.equal(joinResult.state.id, 'ROOM-VBQ62M');
+    assert.equal(joinResult.state.players.length, 2);
+  }
 });
 
 test('Security & Room Engine - Input Sanitization & Boundaries', async () => {

@@ -108,9 +108,15 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
       if (onlineTab === 'create') {
         onCreateOnlineRoom(trimmedName, userColor);
       } else {
-        const cleanCode = roomCodeInput.trim().toUpperCase();
-        if (!cleanCode) {
-          setValidationError('Please enter the 8-character room code (e.g., ROOM-1234).');
+        const rawCode = roomCodeInput.trim().toUpperCase();
+        if (!rawCode) {
+          setValidationError('Please enter your room code (e.g., ROOM-VBQ62M).');
+          return;
+        }
+        // Normalize: if player entered or pasted just the suffix (e.g. "VBQ62M"), auto-prefix "ROOM-"
+        const cleanCode = rawCode.startsWith('ROOM-') ? rawCode : `ROOM-${rawCode}`;
+        if (!/^ROOM-[A-Z0-9]{4,12}$/.test(cleanCode)) {
+          setValidationError('Please enter a valid room code format (e.g., ROOM-VBQ62M).');
           return;
         }
         onJoinOnlineRoom(cleanCode, trimmedName);
@@ -506,14 +512,17 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
               ) : (
                 <div className="space-y-2 pt-1">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
-                    Enter 8-Character Room Code
+                    Enter Room Code
                   </label>
                   <input
                     type="text"
                     value={roomCodeInput}
-                    maxLength={10}
+                    maxLength={16}
                     onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
-                    placeholder="e.g. ROOM-1234"
+                    placeholder="e.g. ROOM-VBQ62M"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm sm:text-base font-mono font-bold tracking-widest text-amber-400 uppercase placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
                   />
                 </div>

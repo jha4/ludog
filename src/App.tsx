@@ -453,13 +453,14 @@ export default function App() {
     setIsLoadingOnline(true);
     setOnlineErrorMessage(null);
     try {
+      const normalizedRoomId = roomId.trim().toUpperCase();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-      const res = await fetch(`/api/rooms/${roomId}/join`, {
+      const res = await fetch(`/api/rooms/${encodeURIComponent(normalizedRoomId)}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName }),
+        body: JSON.stringify({ playerName: playerName.trim() }),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);

@@ -252,8 +252,8 @@ export const GameSetupModal: React.FC<GameSetupModalProps> = ({
                   type="text"
                   value={roomCode}
                   onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. ROOM-1234 (Leave blank to create new)"
-                  maxLength={12}
+                  placeholder="e.g. ROOM-VBQ62M (Leave blank to create new)"
+                  maxLength={16}
                   className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3.5 py-2.5 text-sm text-white uppercase placeholder-slate-500 focus:outline-none focus:border-amber-400"
                 />
               </div>
