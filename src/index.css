@@ -36,3 +36,70 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+
+/* Mobile-first polish: safe viewport sizing, accessible focus, and touch controls. */
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  overscroll-behavior-y: contain;
+}
+
+button,
+[role="button"],
+input,
+select,
+textarea {
+  touch-action: manipulation;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 3px;
+}
+
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+@media (max-width: 420px) {
+  /* Give the board the available phone width without letting it overflow. */
+  div[class*="max-w-[340px]"] {
+    width: 100%;
+    max-width: min(100%, 420px) !important;
+    border-radius: 1rem;
+  }
+
+  /* Prevent iOS Safari from zooming the page when a player taps an input. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
