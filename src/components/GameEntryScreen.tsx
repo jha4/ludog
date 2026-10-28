@@ -219,32 +219,32 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {/* Mode 1: Play with Friends */}
             <motion.button
               type="button"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => handleModeSelect('friends')}
-              className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] relative overflow-hidden ${
+              className={`p-2.5 sm:p-4 rounded-2xl border text-center sm:text-left transition-all flex flex-col justify-between min-h-[95px] sm:min-h-[140px] relative overflow-hidden ${
                 selectedMode === 'friends'
                   ? 'bg-gradient-to-br from-amber-950/90 via-slate-900 to-amber-950/60 border-amber-400 ring-2 ring-amber-500/40 shadow-lg shadow-amber-950/50'
                   : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-75 hover:opacity-100'
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300">
-                  <Globe className="w-5 h-5" />
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-300 mx-auto sm:mx-0">
+                  <Globe className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 {selectedMode === 'friends' && (
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/40">
+                  <span className="hidden sm:inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-amber-500/30 text-amber-300 border border-amber-400/40">
                     Active
                   </span>
                 )}
               </div>
-              <div className="mt-3">
-                <div className="font-fredoka text-base font-bold text-white tracking-wide">Play with Friends</div>
-                <div className="text-[12px] text-slate-400 leading-snug mt-0.5">
+              <div className="mt-2 sm:mt-3">
+                <div className="font-fredoka text-xs sm:text-base font-bold text-white tracking-wide leading-tight">Play with Friends</div>
+                <div className="hidden sm:block text-[12px] text-slate-400 leading-snug mt-0.5">
                   Create or join real online rooms via shareable codes.
                 </div>
               </div>
@@ -256,25 +256,25 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => handleModeSelect('bot')}
-              className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] relative overflow-hidden ${
+              className={`p-2.5 sm:p-4 rounded-2xl border text-center sm:text-left transition-all flex flex-col justify-between min-h-[95px] sm:min-h-[140px] relative overflow-hidden ${
                 selectedMode === 'bot'
                   ? 'bg-gradient-to-br from-indigo-950/90 via-slate-900 to-indigo-950/60 border-indigo-400 ring-2 ring-indigo-500/40 shadow-lg shadow-indigo-950/50'
                   : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-75 hover:opacity-100'
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
-                  <Bot className="w-5 h-5" />
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 mx-auto sm:mx-0">
+                  <Bot className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 {selectedMode === 'bot' && (
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/40">
+                  <span className="hidden sm:inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 border border-indigo-400/40">
                     Active
                   </span>
                 )}
               </div>
-              <div className="mt-3">
-                <div className="font-fredoka text-base font-bold text-white tracking-wide">Play with Bot</div>
-                <div className="text-[12px] text-slate-400 leading-snug mt-0.5">
+              <div className="mt-2 sm:mt-3">
+                <div className="font-fredoka text-xs sm:text-base font-bold text-white tracking-wide leading-tight">Play with Bot</div>
+                <div className="hidden sm:block text-[12px] text-slate-400 leading-snug mt-0.5">
                   Single player match against intelligent AI opponents.
                 </div>
               </div>
@@ -286,25 +286,25 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => handleModeSelect('pass_play')}
-              className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between min-h-[140px] relative overflow-hidden ${
+              className={`p-2.5 sm:p-4 rounded-2xl border text-center sm:text-left transition-all flex flex-col justify-between min-h-[95px] sm:min-h-[140px] relative overflow-hidden ${
                 selectedMode === 'pass_play'
                   ? 'bg-gradient-to-br from-emerald-950/90 via-slate-900 to-emerald-950/60 border-emerald-400 ring-2 ring-emerald-500/40 shadow-lg shadow-emerald-950/50'
                   : 'bg-slate-900/60 border-slate-800 hover:border-slate-700 opacity-75 hover:opacity-100'
               }`}
             >
-              <div className="flex items-start justify-between">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300">
-                  <Users className="w-5 h-5" />
+              <div className="flex items-center justify-between w-full">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 mx-auto sm:mx-0">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 {selectedMode === 'pass_play' && (
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-400/40">
+                  <span className="hidden sm:inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-400/40">
                     Active
                   </span>
                 )}
               </div>
-              <div className="mt-3">
-                <div className="font-fredoka text-base font-bold text-white tracking-wide">Pass & Play</div>
-                <div className="text-[12px] text-slate-400 leading-snug mt-0.5">
+              <div className="mt-2 sm:mt-3">
+                <div className="font-fredoka text-xs sm:text-base font-bold text-white tracking-wide leading-tight">Pass & Play</div>
+                <div className="hidden sm:block text-[12px] text-slate-400 leading-snug mt-0.5">
                   Local multiplayer on 1 device. 100% human players, 0 bots.
                 </div>
               </div>
@@ -514,7 +514,8 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
                     maxLength={10}
                     onChange={(e) => setRoomCodeInput(e.target.value.toUpperCase())}
                     placeholder="e.g. ROOM-1234"
-                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm sm:text-base font-mono font-bold tracking-widest text-amber-400 uppercase placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
+                    style={{ width: '180.8px' }}
+                    className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm sm:text-base font-mono font-bold tracking-widest text-amber-400 uppercase placeholder:text-slate-600 focus:outline-none focus:border-amber-400"
                   />
                 </div>
               )}

@@ -65,13 +65,6 @@ export default function App() {
   // Fast bot mode toggle
   const [isFastBot, setIsFastBot] = useState(false);
 
-  // Animated token hopping override: { color, tokenId, stepCount }
-  const [animatedTokenStep, setAnimatedTokenStep] = useState<{
-    color: PlayerColor;
-    tokenId: number;
-    stepCount: number;
-  } | null>(null);
-
   // Is currently executing hop animation
   const [isHopping, setIsHopping] = useState(false);
 
@@ -254,7 +247,7 @@ export default function App() {
     }
   }, [gameState.hasRolled, gameState.movableTokenIds.length, gameState.status, gameState.mode, isFastBot]);
 
-  // Step-by-Step Hopping Move Token Action
+  // Move Token Action
   const executeMoveToken = useCallback(
     (tokenId: number) => {
       if (!gameState.hasRolled || gameState.diceValue === null || isHopping) return;
@@ -275,68 +268,22 @@ export default function App() {
 
       // Local Single Player / Pass & Play Move
       const color = gameState.currentTurn;
-      const targetToken = gameState.tokens[color].find((t) => t.id === tokenId);
-      if (!targetToken) return;
+      const nextState = moveToken(gameState, tokenId);
+      const actionType = nextState.lastAction?.type;
 
-      const dice = gameState.diceValue;
-
-      // Case 1: Deploy from base onto start tile
-      if (targetToken.state === 'base') {
-        sounds.playSpawn();
-        setIsHopping(true);
-        setAnimatedTokenStep({ color, tokenId, stepCount: 0 });
-
-        setTimeout(() => {
-          setAnimatedTokenStep(null);
-          setIsHopping(false);
-          const nextState = moveToken(gameState, tokenId);
-          setGameState(nextState);
-        }, 260);
-        return;
+      if (actionType === 'capture') {
+        triggerBotReaction(color, 'capture');
+      } else if (actionType === 'home') {
+        triggerBotReaction(color, 'home');
       }
 
-      // Case 2: Multi-step hop along the track
-      setIsHopping(true);
-      const startStep = targetToken.stepCount;
-      const finalStep = startStep + dice;
-      let currentStep = startStep;
+      if (nextState.winner === color) {
+        triggerBotReaction(color, 'win');
+      }
 
-      const hopInterval = setInterval(() => {
-        currentStep++;
-        sounds.playStep(currentStep);
-        setAnimatedTokenStep({ color, tokenId, stepCount: currentStep });
-
-        if (currentStep >= finalStep) {
-          clearInterval(hopInterval);
-          setAnimatedTokenStep(null);
-          setIsHopping(false);
-
-          const nextState = moveToken(gameState, tokenId);
-          const actionType = nextState.lastAction?.type;
-
-          if (actionType === 'capture') {
-            sounds.playCapture();
-            triggerBotReaction(color, 'capture');
-          } else if (actionType === 'home') {
-            sounds.playHome();
-            triggerBotReaction(color, 'home');
-          } else if (finalStep < 51) {
-            // Check if landed on safe star
-            const trackPos = (color === 'red' ? 0 : color === 'blue' ? 13 : color === 'yellow' ? 26 : 39) + finalStep;
-            if ([0, 8, 13, 21, 26, 34, 39, 47].includes(trackPos % 52)) {
-              sounds.playSafeZone();
-            }
-          }
-
-          if (nextState.winner === color) {
-            triggerBotReaction(color, 'win');
-          }
-
-          setGameState(nextState);
-        }
-      }, isFastBot ? 80 : 140);
+      setGameState(nextState);
     },
-    [gameState, isFastBot, isHopping, myPlayerId, triggerBotReaction]
+    [gameState, isHopping, myPlayerId, myPlayerToken, triggerBotReaction]
   );
 
   // Automated Client-Side Bot Loop (Single Player Match)
@@ -600,6 +547,23 @@ export default function App() {
     setCurrentView('menu');
   };
 
+  // Handle Turn Timeout (auto-play or auto-pass on 15s expiration)
+  const handleTurnTimeout = useCallback(() => {
+    if (gameState.status !== 'playing' || isHopping) return;
+
+    if (!gameState.hasRolled && !gameState.isRolling) {
+      handleRollDice();
+    } else if (gameState.hasRolled && gameState.movableTokenIds.length > 0) {
+      executeMoveToken(gameState.movableTokenIds[0]);
+    } else if (gameState.hasRolled && gameState.movableTokenIds.length === 0) {
+      if (gameState.mode !== 'online_room') {
+        setGameState((prev) => passTurn(prev));
+      }
+    }
+  }, [gameState.status, gameState.hasRolled, gameState.isRolling, gameState.movableTokenIds, gameState.mode, isHopping, handleRollDice, executeMoveToken]);
+
+  const turnKey = `${gameState.currentTurn}-${gameState.hasRolled ? 'rolled' : 'unrolled'}-${gameState.diceValue || 0}-${gameState.turnCount}`;
+
   // Turn status calculations
   const currentPlayer = getCurrentPlayer(gameState);
 
@@ -745,6 +709,9 @@ export default function App() {
               tokens={gameState.tokens.green}
               position="top-left"
               isRankedWinner={gameState.rankings.includes('green')}
+              turnDurationSeconds={15}
+              turnKey={turnKey}
+              onTurnTimeout={handleTurnTimeout}
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
@@ -759,6 +726,9 @@ export default function App() {
               tokens={gameState.tokens.yellow}
               position="top-right"
               isRankedWinner={gameState.rankings.includes('yellow')}
+              turnDurationSeconds={15}
+              turnKey={turnKey}
+              onTurnTimeout={handleTurnTimeout}
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
@@ -773,7 +743,8 @@ export default function App() {
             gameState={gameState}
             onTokenClick={executeMoveToken}
             isCurrentPlayerTurn={isHumanTurn && !isHopping}
-            animatedTokenOverride={animatedTokenStep}
+            isFastBot={isFastBot}
+            onAnimationStateChange={(animating) => setIsHopping(animating)}
           />
         </div>
 
@@ -786,6 +757,9 @@ export default function App() {
               tokens={gameState.tokens.red}
               position="bottom-left"
               isRankedWinner={gameState.rankings.includes('red')}
+              turnDurationSeconds={15}
+              turnKey={turnKey}
+              onTurnTimeout={handleTurnTimeout}
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">
@@ -812,6 +786,9 @@ export default function App() {
               tokens={gameState.tokens.blue}
               position="bottom-right"
               isRankedWinner={gameState.rankings.includes('blue')}
+              turnDurationSeconds={15}
+              turnKey={turnKey}
+              onTurnTimeout={handleTurnTimeout}
             />
           ) : (
             <div className="rounded-2xl border border-dashed border-slate-800/60 p-2 flex items-center justify-center text-[10px] text-slate-600 font-bold uppercase">

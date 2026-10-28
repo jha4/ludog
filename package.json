@@ -7,7 +7,7 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
     "start": "node dist/server.js",
-    "test": "tsx --test src/lib/ludoEngine.test.ts serverSecurity.test.ts",
+    "test": "tsx --test src/lib/ludoEngine.test.ts src/lib/tokenAnimation.test.ts serverSecurity.test.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"

@@ -92,26 +92,26 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
       {/* Extended Emoji & Chat Modal */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-700 p-5 shadow-2xl text-slate-100 flex flex-col gap-4"
+              className="w-full max-w-[360px] sm:max-w-sm rounded-3xl bg-slate-900 border border-slate-700 p-4 sm:p-5 shadow-2xl text-slate-100 flex flex-col gap-3.5 sm:gap-4 max-h-[90vh] overflow-y-auto"
             >
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
                     <Sparkles className="w-5 h-5" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-base text-white">Reactions & Chat</h3>
-                    <p className="text-xs text-slate-400">Send animated emojis to all players</p>
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-sm sm:text-base text-white truncate">Reactions & Chat</h3>
+                    <p className="text-[11px] sm:text-xs text-slate-400 truncate">Send animated emojis to all players</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white"
+                  className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white shrink-0 ml-1"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -119,15 +119,15 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
 
               {/* Emoji Grid */}
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
                   Animated Emojis
                 </span>
-                <div className="grid grid-cols-5 gap-2">
+                <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
                   {QUICK_EMOJIS.map((emoji) => (
                     <button
                       key={emoji}
                       onClick={() => setSelectedEmoji(emoji)}
-                      className={`h-11 sm:h-12 flex items-center justify-center rounded-2xl text-2xl border transition-all cursor-pointer ${
+                      className={`h-10 sm:h-12 flex items-center justify-center rounded-2xl text-xl sm:text-2xl border transition-all cursor-pointer ${
                         selectedEmoji === emoji
                           ? 'bg-amber-500/30 border-amber-400 scale-105 shadow-md shadow-amber-500/20'
                           : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
@@ -141,15 +141,15 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
 
               {/* Quick Chat Shoutouts */}
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
+                <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
                   Quick Shoutouts
                 </span>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                   {QUICK_MESSAGES.map((msg) => (
                     <button
                       key={msg}
                       onClick={() => handleSend(selectedEmoji, msg)}
-                      className="px-3 py-2 text-xs font-medium rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700 text-slate-200 text-left transition-all hover:border-slate-500"
+                      className="px-2.5 sm:px-3 py-2 text-xs font-medium rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700 text-slate-200 text-left transition-all hover:border-slate-500 truncate"
                     >
                       {msg}
                     </button>
@@ -158,8 +158,8 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
               </div>
 
               {/* Custom Message Input */}
-              <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
-                <div className="text-2xl p-2 rounded-xl bg-slate-800 border border-slate-700">
+              <div className="flex items-center gap-2 pt-2 border-t border-slate-800 w-full">
+                <div className="text-xl sm:text-2xl p-1.5 sm:p-2 rounded-xl bg-slate-800 border border-slate-700 shrink-0 flex items-center justify-center">
                   {selectedEmoji}
                 </div>
                 <input
@@ -173,11 +173,11 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
                       handleSend(selectedEmoji, customText.trim() || undefined);
                     }
                   }}
-                  className="flex-1 rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  className="flex-1 min-w-0 rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                 />
                 <button
                   onClick={() => handleSend(selectedEmoji, customText.trim() || undefined)}
-                  className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold transition-all shadow-md shadow-amber-500/30 cursor-pointer"
+                  className="p-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold transition-all shadow-md shadow-amber-500/30 cursor-pointer shrink-0 flex items-center justify-center"
                 >
                   <Send className="w-4 h-4" />
                 </button>
