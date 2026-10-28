@@ -791,7 +791,8 @@ app.get('/api/rooms/:roomId/stream', (req: Request, res: Response) => {
 
 async function startServer() {
   if (process.env.NODE_ENV === 'production') {
-    const distPath = path.resolve(__dirname, 'dist');
+    // In production this file runs from dist/server.js, so __dirname already points to dist.
+    const distPath = __dirname;
     app.use(express.static(distPath));
 
     // Express 404 handler for API routes (prevent HTML fallback swallowing API errors)
