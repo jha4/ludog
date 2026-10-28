@@ -51,6 +51,7 @@ export default function App() {
   // Online multiplayer state
   const [isHost, setIsHost] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string>('');
+  const [myPlayerToken, setMyPlayerToken] = useState<string>('');
   const [isLoadingOnline, setIsLoadingOnline] = useState(false);
   const [onlineErrorMessage, setOnlineErrorMessage] = useState<string | null>(null);
 
@@ -123,12 +124,15 @@ export default function App() {
       if (gameState.mode === 'online_room') {
         fetch(`/api/rooms/${gameState.id}/emoji`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${myPlayerToken}`,
+          },
           body: JSON.stringify(newEvent),
         }).catch(() => {});
       }
     },
-    [gameState.id, gameState.mode, gameState.players, myPlayerId]
+    [gameState.id, gameState.mode, gameState.players, myPlayerId, myPlayerToken]
   );
 
   // Trigger Local Bot Reaction on special events
@@ -209,7 +213,10 @@ export default function App() {
       // Authoritative Server Roll
       fetch(`/api/rooms/${gameState.id}/roll`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${myPlayerToken}`,
+        },
         body: JSON.stringify({ playerId: myPlayerId }),
       }).catch(() => {});
       return;
@@ -257,7 +264,10 @@ export default function App() {
         // Authoritative Server Move
         fetch(`/api/rooms/${gameState.id}/move`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${myPlayerToken}`,
+          },
           body: JSON.stringify({ tokenId, playerId: myPlayerId }),
         }).catch(() => {});
         return;
@@ -390,7 +400,10 @@ export default function App() {
     if (gameState.mode === 'online_room') {
       fetch(`/api/rooms/${gameState.id}/restart`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${myPlayerToken}`,
+        },
         body: JSON.stringify({ playerId: myPlayerId }),
       }).catch(() => {});
       return;
@@ -469,7 +482,13 @@ export default function App() {
 
       setGameState(data);
       setIsHost(true);
-      setMyPlayerId(data.players[0].id);
+      setMyPlayerId(data.assignedPlayerId || data.players[0].id);
+      setMyPlayerToken(data.playerToken || '');
+      if (typeof window !== 'undefined' && data.playerToken) {
+        try {
+          localStorage.setItem(`ludo_token_${data.id}`, data.playerToken);
+        } catch {}
+      }
       setCurrentView('waiting_room');
     } catch (err: any) {
       if (err.name === 'AbortError') {
@@ -511,6 +530,12 @@ export default function App() {
       setGameState(data);
       setIsHost(false);
       setMyPlayerId(data.assignedPlayerId);
+      setMyPlayerToken(data.playerToken || '');
+      if (typeof window !== 'undefined' && data.playerToken) {
+        try {
+          localStorage.setItem(`ludo_token_${data.id}`, data.playerToken);
+        } catch {}
+      }
 
       if (data.status === 'playing') {
         setCurrentView('game');
@@ -533,7 +558,10 @@ export default function App() {
     try {
       const res = await fetch(`/api/rooms/${gameState.id}/start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${myPlayerToken}`,
+        },
         body: JSON.stringify({ playerId: myPlayerId }),
       });
       if (res.ok) {
@@ -553,9 +581,18 @@ export default function App() {
     if (gameState.mode === 'online_room' && myPlayerId) {
       fetch(`/api/rooms/${gameState.id}/leave`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${myPlayerToken}`,
+        },
         body: JSON.stringify({ playerId: myPlayerId }),
       }).catch(() => {});
+
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.removeItem(`ludo_token_${gameState.id}`);
+        } catch {}
+      }
     }
     if (sseRef.current) {
       sseRef.current.close();
