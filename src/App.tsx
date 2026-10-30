@@ -652,52 +652,80 @@ export default function App() {
       {/* Main Board Arena Container */}
       <div className="w-full max-w-xl md:max-w-2xl bg-slate-900/90 backdrop-blur-md rounded-3xl border border-slate-800 shadow-2xl p-2.5 sm:p-4 flex flex-col gap-2 my-auto">
         {/* ================= HEADER BAR ================= */}
-        <header className="flex items-center justify-between gap-2 px-1 pb-2 border-b border-slate-800/80">
-          <div className="flex items-center gap-2">
+        <header className="flex items-center justify-between gap-2.5 px-2 py-2 sm:px-3 sm:py-2.5 bg-slate-950/40 rounded-2xl border border-slate-800/60 mb-0.5">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handleLeaveRoom}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-semibold transition-all active:scale-95 cursor-pointer shadow-sm"
               title="Return to Main Menu"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Menu</span>
+              <span className="hidden xs:inline">Menu</span>
             </button>
 
-            <div>
-              <h1 className="font-fredoka font-black text-sm sm:text-base tracking-wide text-white leading-tight flex items-center gap-1.5">
-                <Crown className="w-4 h-4 text-amber-400" />
-                LUDO ROYAL
-              </h1>
-              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-                {gameState.mode === 'single_player'
-                  ? 'Play with Bot 🤖'
-                  : gameState.mode === 'pass_and_play'
-                  ? 'Pass & Play 👥'
-                  : 'Play with Friends 🌐'}
-              </span>
+            {/* Brand Logo & Title Lockup */}
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-950 p-1 border border-slate-700/80 shadow-sm flex items-center justify-center shrink-0">
+                <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                  <rect x="2" y="2" width="14" height="14" rx="3.5" fill="#EF4444" />
+                  <rect x="20" y="2" width="14" height="14" rx="3.5" fill="#10B981" />
+                  <rect x="2" y="20" width="14" height="14" rx="3.5" fill="#3B82F6" />
+                  <rect x="20" y="20" width="14" height="14" rx="3.5" fill="#F59E0B" />
+                  <circle cx="9" cy="9" r="2.5" fill="white" fillOpacity="0.95" />
+                  <circle cx="27" cy="9" r="2.5" fill="white" fillOpacity="0.95" />
+                  <circle cx="9" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
+                  <circle cx="27" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
+                  <rect x="12" y="12" width="12" height="12" rx="3" fill="#0B1020" stroke="#F59E0B" strokeWidth="1.2" />
+                  <path d="M14.5 20.5H21.5L22 17.5L19.5 18.5L18 15.5L16.5 18.5L14 17.5L14.5 20.5Z" fill="#FBBF24" />
+                </svg>
+              </div>
+
+              <div>
+                <h1 className="font-outfit font-extrabold text-sm sm:text-base tracking-tight text-white leading-none flex items-center gap-1">
+                  <span>LUDO</span>
+                  <span className="text-amber-300/90 font-black">ROYAL</span>
+                </h1>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <span className="text-[10px] sm:text-[11px] font-medium text-amber-200/80 tracking-wide">
+                    {gameState.mode === 'single_player'
+                      ? 'AI Battle'
+                      : gameState.mode === 'pass_and_play'
+                      ? 'Pass & Play'
+                      : 'Online Match'}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          {/* Supporting Information Chips */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Player Count Chip */}
+            <div className="hidden sm:inline-flex items-center px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/60 text-[11px] font-medium text-slate-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse" />
+              <span>{gameState.players.length} Players</span>
+            </div>
+
             {/* Room Code Badge (if online room) */}
             {gameState.mode === 'online_room' && (
               <button
                 onClick={handleCopyRoomCode}
-                className="px-2 py-1 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white border border-slate-700/80 text-[11px] font-mono flex items-center gap-1 shadow-sm cursor-pointer"
+                className="px-2 sm:px-2.5 py-1 rounded-lg bg-amber-400/10 hover:bg-amber-400/20 text-amber-200/90 border border-amber-400/30 text-[11px] sm:text-xs font-mono font-semibold flex items-center gap-1.5 shadow-sm cursor-pointer transition active:scale-95"
                 title="Click to copy Room Code"
               >
+                <span className="text-[9px] uppercase font-sans text-amber-300/70 font-bold hidden xs:inline">Room</span>
                 <span>{gameState.id}</span>
-                {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3 text-slate-400" />}
+                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5 text-amber-300/70" />}
               </button>
             )}
 
             {/* Sound Mute Toggle */}
             <button
               onClick={toggleSound}
-              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+              className={`p-1.5 sm:p-2 rounded-xl border transition-all cursor-pointer shadow-sm active:scale-95 ${
                 isMuted
-                  ? 'bg-rose-500/20 border-rose-500/30 text-rose-400'
-                  : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-300'
+                  ? 'bg-rose-500/15 border-rose-500/30 text-rose-400 hover:bg-rose-500/25'
+                  : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700 text-slate-300 hover:text-white'
               }`}
               title={isMuted ? 'Unmute Sounds' : 'Mute Sounds'}
             >

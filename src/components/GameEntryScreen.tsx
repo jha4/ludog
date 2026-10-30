@@ -7,7 +7,6 @@ import {
   Users,
   Globe,
   Sparkles,
-  HelpCircle,
   Play,
   ArrowRight,
   ShieldAlert,
@@ -49,7 +48,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
   onOpenRules,
 }) => {
   const [selectedMode, setSelectedMode] = useState<GameMode>('friends');
-  const [userName, setUserName] = useState<string>('Commander');
+  const [userName, setUserName] = useState<string>('');
   const [userColor, setUserColor] = useState<PlayerColor>('red');
   const [botCount, setBotCount] = useState<number>(3);
   const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
@@ -82,7 +81,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
 
     const trimmedName = userName.trim();
     if (!trimmedName) {
-      setValidationError('Please enter a username to continue.');
+      setValidationError('Please enter a player name to continue.');
       return;
     }
 
@@ -133,34 +132,44 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
       <div className="fixed bottom-12 right-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
       {/* Top Header */}
-      <header className="max-w-4xl mx-auto w-full flex items-center justify-between py-2">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 via-rose-500 to-indigo-600 p-0.5 shadow-lg shadow-rose-950/40 flex items-center justify-center">
-            <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Crown className="w-5 h-5 text-amber-400 animate-pulse" />
-            </div>
+      <header className="max-w-4xl mx-auto w-full bg-slate-900/70 backdrop-blur-md border border-slate-800 rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 shadow-lg flex items-center justify-between gap-3 my-2">
+        <div className="flex items-center gap-3">
+          {/* Custom Ludo Royal Emblem */}
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-950 p-1.5 border border-slate-700/80 shadow-md flex items-center justify-center shrink-0">
+            <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+              {/* 4 Colored Player Quadrants */}
+              <rect x="2" y="2" width="14" height="14" rx="3.5" fill="#EF4444" />
+              <rect x="20" y="2" width="14" height="14" rx="3.5" fill="#10B981" />
+              <rect x="2" y="20" width="14" height="14" rx="3.5" fill="#3B82F6" />
+              <rect x="20" y="20" width="14" height="14" rx="3.5" fill="#F59E0B" />
+
+              {/* Quadrant Token Pips */}
+              <circle cx="9" cy="9" r="2.5" fill="white" fillOpacity="0.95" />
+              <circle cx="27" cy="9" r="2.5" fill="white" fillOpacity="0.95" />
+              <circle cx="9" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
+              <circle cx="27" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
+
+              {/* Center Royal Shield & Crown */}
+              <rect x="12" y="12" width="12" height="12" rx="3" fill="#0B1020" stroke="#F59E0B" strokeWidth="1.2" />
+              <path d="M14.5 20.5H21.5L22 17.5L19.5 18.5L18 15.5L16.5 18.5L14 17.5L14.5 20.5Z" fill="#FBBF24" />
+              <circle cx="14" cy="17" r="0.75" fill="#FDE047" />
+              <circle cx="18" cy="15" r="0.75" fill="#FDE047" />
+              <circle cx="22" cy="17" r="0.75" fill="#FDE047" />
+            </svg>
           </div>
+
           <div>
-            <h1 className="font-fredoka text-xl sm:text-2xl font-bold tracking-wide bg-gradient-to-r from-amber-200 via-rose-200 to-indigo-200 bg-clip-text text-transparent flex items-center gap-1.5">
-              LUDO ROYAL
-              <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                PRO
-              </span>
-            </h1>
-            <p className="text-[11px] text-slate-400 font-medium">Classic 4-Player Strategy Board Game</p>
+            <div className="flex items-center gap-2">
+              <div className="font-outfit font-extrabold text-xl sm:text-2xl tracking-tight text-white flex items-center gap-1.5 leading-none">
+                <span>LUDO</span>
+                <span className="text-amber-400 font-black">ROYAL</span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 font-medium mt-1">
+              Classic 4-Player Strategy Board Game
+            </p>
           </div>
         </div>
-
-        <button
-          onClick={() => {
-            sounds.playClick();
-            onOpenRules();
-          }}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 text-xs text-slate-300 hover:text-white hover:bg-slate-800 hover:border-slate-700 transition shadow-sm active:scale-95"
-        >
-          <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
-          <span>Rules</span>
-        </button>
       </header>
 
       {/* Main Form Content */}
@@ -176,13 +185,27 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
                 type="text"
                 value={userName}
                 maxLength={16}
-                onChange={(e) => setUserName(e.target.value)}
+                onChange={(e) => {
+                  setUserName(e.target.value);
+                  if (validationError && e.target.value.trim()) {
+                    setValidationError(null);
+                  }
+                }}
                 placeholder="Enter your nickname..."
-                className="w-full bg-slate-950/90 border border-slate-700 rounded-xl px-4 py-2.5 text-sm sm:text-base font-semibold text-white focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400 transition"
+                className={`w-full bg-slate-950/90 border rounded-xl px-4 py-2.5 text-sm sm:text-base font-semibold text-white focus:outline-none transition ${
+                  validationError && !userName.trim()
+                    ? 'border-rose-500 focus:border-rose-500 focus:ring-1 focus:ring-rose-500'
+                    : 'border-slate-700 focus:border-amber-400 focus:ring-1 focus:ring-amber-400'
+                }`}
               />
               <span className="absolute right-3 top-3 text-[11px] text-slate-500 font-mono">
                 {userName.length}/16
               </span>
+              {validationError && !userName.trim() && (
+                <span className="block mt-1 text-[11px] text-rose-400 font-medium">
+                  Player name is required.
+                </span>
+              )}
             </div>
 
             {selectedMode !== 'pass_play' && (
@@ -323,12 +346,8 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
         <div className="bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-xl">
           {selectedMode === 'bot' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-white font-fredoka tracking-wide">AI Opponents Configuration</h3>
-                  <p className="text-[12px] text-slate-400">Choose how many bot players and their strategy level.</p>
-                </div>
-                <Bot className="w-5 h-5 text-indigo-400" />
+              <div className="border-b border-slate-800/80 pb-2.5">
+                <h3 className="text-sm font-bold text-white font-fredoka tracking-wide">AI Opponents Configuration</h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
@@ -387,14 +406,8 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
 
           {selectedMode === 'pass_play' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-white font-fredoka tracking-wide">Pass & Play Setup</h3>
-                  <p className="text-[12px] text-slate-400">
-                    Each seat is controlled by a human sharing this device. Zero bots.
-                  </p>
-                </div>
-                <Users className="w-5 h-5 text-emerald-400" />
+              <div className="border-b border-slate-800/80 pb-2.5">
+                <h3 className="text-sm font-bold text-white font-fredoka tracking-wide">Pass & Play Setup</h3>
               </div>
 
               <div>
@@ -460,14 +473,8 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
 
           {selectedMode === 'friends' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                <div>
-                  <h3 className="text-sm font-bold text-white font-fredoka tracking-wide">Play with Friends Online</h3>
-                  <p className="text-[12px] text-slate-400">
-                    Host an online lobby or join an existing game using a room code.
-                  </p>
-                </div>
-                <Globe className="w-5 h-5 text-amber-400" />
+              <div className="border-b border-slate-800/80 pb-2.5">
+                <h3 className="text-sm font-bold text-white font-fredoka tracking-wide">Play with Friends Online</h3>
               </div>
 
               {/* Sub tabs: Create vs Join */}
@@ -504,13 +511,7 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
                 </button>
               </div>
 
-              {onlineTab === 'create' ? (
-                <div className="space-y-3 pt-1">
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 text-xs text-amber-200">
-                    You will become the room host. Once created, you will get a unique shareable room code to invite your friends. Real players only, no bots.
-                  </div>
-                </div>
-              ) : (
+              {onlineTab === 'join' && (
                 <div className="space-y-2 pt-1">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-400">
                     Enter Room Code
@@ -587,11 +588,6 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
           )}
         </motion.button>
       </main>
-
-      {/* Footer */}
-      <footer className="max-w-4xl mx-auto w-full text-center py-2 text-[11px] text-slate-500">
-        Ludo Royal Engine v2.0 • Standard 52-Cell Track with Safe Stars & Consecutive-Six Detection
-      </footer>
     </div>
   );
 };
