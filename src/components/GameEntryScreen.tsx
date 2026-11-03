@@ -134,8 +134,8 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
       {/* Top Header */}
       <header className="max-w-4xl mx-auto w-full bg-slate-900/70 backdrop-blur-md border border-slate-800 rounded-2xl px-4 py-3 sm:px-5 sm:py-3.5 shadow-lg flex items-center justify-between gap-3 my-2">
         <div className="flex items-center gap-3">
-          {/* Custom Ludo Royal Emblem */}
-          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-950 p-1.5 border border-slate-700/80 shadow-md flex items-center justify-center shrink-0">
+          {/* Custom Ludo Rage Emblem */}
+          <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-950 p-1.5 border border-orange-500/40 shadow-md shadow-orange-950/30 flex items-center justify-center shrink-0">
             <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
               {/* 4 Colored Player Quadrants */}
               <rect x="2" y="2" width="14" height="14" rx="3.5" fill="#EF4444" />
@@ -149,24 +149,35 @@ export const GameEntryScreen: React.FC<GameEntryScreenProps> = ({
               <circle cx="9" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
               <circle cx="27" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
 
-              {/* Center Royal Shield & Crown */}
-              <rect x="12" y="12" width="12" height="12" rx="3" fill="#0B1020" stroke="#F59E0B" strokeWidth="1.2" />
-              <path d="M14.5 20.5H21.5L22 17.5L19.5 18.5L18 15.5L16.5 18.5L14 17.5L14.5 20.5Z" fill="#FBBF24" />
-              <circle cx="14" cy="17" r="0.75" fill="#FDE047" />
-              <circle cx="18" cy="15" r="0.75" fill="#FDE047" />
-              <circle cx="22" cy="17" r="0.75" fill="#FDE047" />
+              {/* Center Rage Shield & Fiery Energy Spark */}
+              <rect x="11.5" y="11.5" width="13" height="13" rx="3.5" fill="#090D16" stroke="#FF4500" strokeWidth="1.2" />
+              <path
+                d="M18 13.5C18 13.5 14.8 17 14.8 19.8C14.8 21.8 16.2 23.2 18 23.2C19.8 23.2 21.2 21.8 21.2 19.8C21.2 18.5 20.3 17.6 19.8 16.5C19.5 17.5 18.8 18.2 18 18.2C17.4 18.2 17 17.7 18 13.5Z"
+                fill="url(#entryFlameGrad)"
+              />
+              <circle cx="18" cy="21.5" r="0.9" fill="#FDE047" />
+
+              <defs>
+                <linearGradient id="entryFlameGrad" x1="14.8" y1="13.5" x2="21.2" y2="23.2" gradientUnits="userSpaceOnUse">
+                  <stop offset="0%" stopColor="#FFD700" />
+                  <stop offset="50%" stopColor="#FF5500" />
+                  <stop offset="100%" stopColor="#EF4444" />
+                </linearGradient>
+              </defs>
             </svg>
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <div className="font-outfit font-extrabold text-xl sm:text-2xl tracking-tight text-white flex items-center gap-1.5 leading-none">
+              <div className="font-outfit font-black text-xl sm:text-2xl tracking-tight text-white flex items-center gap-1.5 leading-none">
                 <span>LUDO</span>
-                <span className="text-amber-400 font-black">ROYAL</span>
+                <span className="bg-gradient-to-r from-orange-400 via-amber-300 to-rose-500 bg-clip-text text-transparent font-black tracking-wide">
+                  RAGE
+                </span>
               </div>
             </div>
-            <p className="text-xs text-slate-400 font-medium mt-1">
-              Classic 4-Player Strategy Board Game
+            <p className="text-xs font-semibold text-amber-400/90 tracking-wide mt-1 flex items-center gap-1">
+              <span>Roll. Rule. Rage.</span>
             </p>
           </div>
         </div>

@@ -62,6 +62,7 @@ export interface EmojiEvent {
   senderColor: PlayerColor;
   emoji: string;
   text?: string;
+  stickerId?: string;
   timestamp: number;
 }
 
@@ -293,7 +294,7 @@ export function createNewGame(
 
   return {
     id: roomId,
-    name: 'Royal Ludo Arena',
+    name: 'Ludo Rage Arena',
     mode,
     players,
     tokens,
@@ -397,6 +398,42 @@ export function startOnlineRoomGame(state: GameState): GameState | { error: stri
 }
 
 /**
+ * Restarts an active or finished online room game while preserving all connected players,
+ * their IDs, colors, names, avatars, and types.
+ */
+export function restartOnlineRoomGame(state: GameState): GameState {
+  const initialTokens: Record<PlayerColor, Token[]> = {
+    red: createInitialTokens('red'),
+    green: createInitialTokens('green'),
+    yellow: createInitialTokens('yellow'),
+    blue: createInitialTokens('blue'),
+  };
+
+  const startingColor = state.players.length > 0 ? state.players[0].color : 'red';
+  const startingPlayer = state.players.find((p) => p.color === startingColor) || state.players[0];
+
+  return {
+    ...state,
+    tokens: initialTokens,
+    currentTurn: startingColor,
+    diceValue: null,
+    hasRolled: false,
+    isRolling: false,
+    consecutiveSixes: 0,
+    movableTokenIds: [],
+    status: state.players.length >= 2 ? 'playing' : 'waiting',
+    winner: null,
+    rankings: [],
+    turnTimeRemaining: 20,
+    lastAction: undefined,
+    history: [
+      `Match restarted! First turn: ${startingPlayer ? startingPlayer.name : startingColor} (${startingColor.toUpperCase()})`,
+      ...state.history.slice(0, 19),
+    ],
+  };
+}
+
+/**
  * Calculates the board track position (0-51) given a token's stepCount and color.
  * Returns null if the token is in base, in home column, or in home.
  */
@@ -450,6 +487,7 @@ export function passTurn(state: GameState): GameState {
     diceValue: null,
     movableTokenIds: [],
     isRolling: false,
+    consecutiveSixes: 0,
   };
 }
 
@@ -501,7 +539,7 @@ export function rollDice(state: GameState, fixedValue?: number, autoPass: boolea
         diceValue: null,
         hasRolled: false,
         isRolling: false,
-        consecutiveSixes: newConsecutiveSixes,
+        consecutiveSixes: 0,
         movableTokenIds: [],
         currentTurn: nextPlayer,
         history: [

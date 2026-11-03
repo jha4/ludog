@@ -18,6 +18,7 @@ import {
 import {
   generateTokenPath,
   calculateHopPosition,
+  calculateStepDuration,
   isReducedMotionPreferred,
   DEFAULT_ANIMATION_CONFIG,
   FAST_ANIMATION_CONFIG,
@@ -569,7 +570,8 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         maxForwardDuration = Math.max(maxForwardDuration, animConfig.spawnDurationMs);
       } else {
         const stepCount = Math.max(1, item.targetStep - item.startStep);
-        const duration = 60 + stepCount * animConfig.stepDurationMs;
+        const stepDur = calculateStepDuration(stepCount, animConfig);
+        const duration = 60 + stepCount * stepDur;
         maxForwardDuration = Math.max(maxForwardDuration, duration);
       }
     });
@@ -635,7 +637,8 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
       }
 
       // Step-by-step traversal through each intermediate square
-      const stepDuration = animConfig.stepDurationMs;
+      const intermediateSteps = path.slice(1);
+      const stepDuration = calculateStepDuration(intermediateSteps.length, animConfig);
       const anticipationMs = 50;
 
       // Anticipation lift
@@ -651,7 +654,6 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
       }));
 
       // Traverse each intermediate square strictly in sequence
-      const intermediateSteps = path.slice(1);
       intermediateSteps.forEach((stepNum, idx) => {
         const isFinalStep = idx === intermediateSteps.length - 1;
 

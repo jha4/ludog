@@ -95,9 +95,9 @@ export default function App() {
     }
   };
 
-  // Broadcast Emoji Reaction
+  // Broadcast Emoji / Sticker / Shoutout Reaction
   const handleSendEmoji = useCallback(
-    (emoji: string, text?: string) => {
+    (emoji: string, text?: string, stickerId?: string) => {
       const activePlayer = gameState.players.find((p) => p.id === myPlayerId) ||
         gameState.players.find((p) => p.type === 'human') ||
         gameState.players[0];
@@ -109,6 +109,7 @@ export default function App() {
         senderColor: activePlayer.color,
         emoji,
         text,
+        stickerId,
         timestamp: Date.now(),
       };
 
@@ -134,23 +135,48 @@ export default function App() {
       const botPlayer = gameState.players.find((p) => p.color === botColor);
       if (!botPlayer || botPlayer.type !== 'bot') return;
 
-      const reactionMap = {
-        roll6: ['🔥', '🎲', '😎', '⚡'],
-        capture: ['🎯', '😂', '👑', '💥'],
-        captured: ['😭', '💀', '😱', '😡'],
-        home: ['🥳', '🏆', '🎉', '👏'],
-        win: ['👑', '🥳', '🏆', '🥇'],
+      const reactionMap: Record<string, { emoji: string; text?: string; stickerId?: string }[]> = {
+        roll6: [
+          { emoji: '🔥', text: 'Six again! 🎲', stickerId: 'ludo_six_again' },
+          { emoji: '🎲', text: 'My turn to rule! 👑' },
+          { emoji: '⚡', stickerId: 'ludo_six_again' },
+          { emoji: '😎', text: 'Bring it on! 🔥' },
+        ],
+        capture: [
+          { emoji: '🎯', text: "You're going home! 🎯", stickerId: 'ludo_token_captured' },
+          { emoji: '😂', text: 'Nice try! 😉', stickerId: 'troll_nice_try' },
+          { emoji: '💥', text: 'Back to base! 👋', stickerId: 'ludo_sending_home' },
+          { emoji: '👑', text: 'Dominated! 🏆', stickerId: 'victory_trophy' },
+        ],
+        captured: [
+          { emoji: '😭', text: 'Seriously?! 😤', stickerId: 'rage_table_flip' },
+          { emoji: '💀', text: 'This game is personal! 🤬', stickerId: 'rage_unbelievable' },
+          { emoji: '😡', text: 'Total Rage! 🌋', stickerId: 'rage_fire_mode' },
+          { emoji: '😱', text: 'Unbelievable! 🤯' },
+        ],
+        home: [
+          { emoji: '🥳', text: 'Almost there! 💫', stickerId: 'ludo_almost_home' },
+          { emoji: '🏆', text: "That's how it's done! ✨", stickerId: 'victory_trophy' },
+          { emoji: '🎉', text: 'One more move! 🏁' },
+        ],
+        win: [
+          { emoji: '👑', text: 'King of Ludo! 👑', stickerId: 'victory_king' },
+          { emoji: '🏆', text: 'Easy win! 😎', stickerId: 'victory_too_easy' },
+          { emoji: '🥇', text: 'Champion! 🏆', stickerId: 'victory_trophy' },
+        ],
       };
 
-      const options = reactionMap[situation] || ['🎲'];
-      const emoji = options[Math.floor(Math.random() * options.length)];
+      const options = reactionMap[situation] || [{ emoji: '🎲' }];
+      const chosen = options[Math.floor(Math.random() * options.length)];
 
       const newEvent: EmojiEvent = {
         id: 'bot-emoji-' + Math.random().toString(36).substring(2, 9),
         senderId: botPlayer.id,
         senderName: botPlayer.name,
         senderColor: botColor,
-        emoji,
+        emoji: chosen.emoji,
+        text: chosen.text,
+        stickerId: chosen.stickerId,
         timestamp: Date.now(),
       };
 
@@ -162,7 +188,8 @@ export default function App() {
   // Connect to backend SSE stream for online rooms
   useEffect(() => {
     if (gameState.mode === 'online_room' && (currentView === 'waiting_room' || currentView === 'game')) {
-      const source = new EventSource(`/api/rooms/${gameState.id}/stream`);
+      const tokenParam = myPlayerToken ? `?token=${encodeURIComponent(myPlayerToken)}` : '';
+      const source = new EventSource(`/api/rooms/${gameState.id}/stream${tokenParam}`);
       sseRef.current = source;
 
       source.addEventListener('state_update', (e) => {
@@ -194,7 +221,7 @@ export default function App() {
         source.close();
       };
     }
-  }, [gameState.id, gameState.mode, currentView]);
+  }, [gameState.id, gameState.mode, currentView, myPlayerToken]);
 
   // Handle Dice Rolling
   const handleRollDice = useCallback(() => {
@@ -665,7 +692,7 @@ export default function App() {
 
             {/* Brand Logo & Title Lockup */}
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-950 p-1 border border-slate-700/80 shadow-sm flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-950 p-1 border border-orange-500/40 shadow-sm flex items-center justify-center shrink-0">
                 <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
                   <rect x="2" y="2" width="14" height="14" rx="3.5" fill="#EF4444" />
                   <rect x="20" y="2" width="14" height="14" rx="3.5" fill="#10B981" />
@@ -675,15 +702,27 @@ export default function App() {
                   <circle cx="27" cy="9" r="2.5" fill="white" fillOpacity="0.95" />
                   <circle cx="9" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
                   <circle cx="27" cy="27" r="2.5" fill="white" fillOpacity="0.95" />
-                  <rect x="12" y="12" width="12" height="12" rx="3" fill="#0B1020" stroke="#F59E0B" strokeWidth="1.2" />
-                  <path d="M14.5 20.5H21.5L22 17.5L19.5 18.5L18 15.5L16.5 18.5L14 17.5L14.5 20.5Z" fill="#FBBF24" />
+                  <rect x="11.5" y="11.5" width="13" height="13" rx="3.5" fill="#090D16" stroke="#FF4500" strokeWidth="1.2" />
+                  <path
+                    d="M18 13.5C18 13.5 14.8 17 14.8 19.8C14.8 21.8 16.2 23.2 18 23.2C19.8 23.2 21.2 21.8 21.2 19.8C21.2 18.5 20.3 17.6 19.8 16.5C19.5 17.5 18.8 18.2 18 18.2C17.4 18.2 17 17.7 18 13.5Z"
+                    fill="url(#appHeaderFlameGrad)"
+                  />
+                  <defs>
+                    <linearGradient id="appHeaderFlameGrad" x1="14.8" y1="13.5" x2="21.2" y2="23.2" gradientUnits="userSpaceOnUse">
+                      <stop offset="0%" stopColor="#FFD700" />
+                      <stop offset="50%" stopColor="#FF5500" />
+                      <stop offset="100%" stopColor="#EF4444" />
+                    </linearGradient>
+                  </defs>
                 </svg>
               </div>
 
               <div>
-                <h1 className="font-outfit font-extrabold text-sm sm:text-base tracking-tight text-white leading-none flex items-center gap-1">
+                <h1 className="font-outfit font-black text-sm sm:text-base tracking-tight text-white leading-none flex items-center gap-1">
                   <span>LUDO</span>
-                  <span className="text-amber-300/90 font-black">ROYAL</span>
+                  <span className="bg-gradient-to-r from-orange-400 via-amber-300 to-rose-500 bg-clip-text text-transparent font-black">
+                    RAGE
+                  </span>
                 </h1>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   <span className="text-[10px] sm:text-[11px] font-medium text-amber-200/80 tracking-wide">

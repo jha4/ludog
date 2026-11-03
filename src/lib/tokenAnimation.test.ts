@@ -69,3 +69,22 @@ test('Token Animation - Configuration constants match refined specifications', (
   // Fast mode is suitably faster for snappy bot moves
   assert.ok(FAST_ANIMATION_CONFIG.stepDurationMs < DEFAULT_ANIMATION_CONFIG.stepDurationMs);
 });
+
+test('Token Animation - calculateStepDuration compresses steps within maxTotalDurationMs', async () => {
+  const { calculateStepDuration } = await import('./tokenAnimation.ts');
+
+  // Short movement (e.g. 2 steps): maintains nominal stepDurationMs (175ms)
+  const shortMoveDur = calculateStepDuration(2, DEFAULT_ANIMATION_CONFIG);
+  assert.equal(shortMoveDur, DEFAULT_ANIMATION_CONFIG.stepDurationMs);
+
+  // Maximum step count (6 steps):
+  // 6 * 175 = 1050ms + 50 + 60 = 1160ms <= 1400ms maxTotalDurationMs
+  const sixStepDur = calculateStepDuration(6, DEFAULT_ANIMATION_CONFIG);
+  assert.equal(sixStepDur, DEFAULT_ANIMATION_CONFIG.stepDurationMs);
+
+  // High hypothetical step count (e.g. 15 steps):
+  // (1400 - 50 - 60) / 15 = 1290 / 15 = 86ms
+  const longMoveDur = calculateStepDuration(15, DEFAULT_ANIMATION_CONFIG);
+  assert.ok(longMoveDur < DEFAULT_ANIMATION_CONFIG.stepDurationMs);
+  assert.equal(longMoveDur, 86);
+});

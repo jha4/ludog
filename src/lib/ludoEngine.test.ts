@@ -302,3 +302,72 @@ test('assigns diagonally opposite corners for 2-player games across modes', () =
     assert.equal(joinerRes.player.color, 'yellow');
   }
 });
+
+test('passTurn and autoPass explicitly reset consecutiveSixes to 0', async () => {
+  const { passTurn } = await import('./ludoEngine.ts');
+  let game = createNewGame('single_player', 'Alice', 'red', 3);
+
+  // Deploy token and roll a 6
+  game = rollDice(game, 6);
+  game = moveToken(game, 0);
+  assert.equal(game.consecutiveSixes, 1);
+
+  // If turn is passed, consecutiveSixes must be reset to 0
+  const passed = passTurn(game);
+  assert.equal(passed.consecutiveSixes, 0);
+  assert.equal(passed.currentTurn, 'green');
+
+  // Auto-pass test: rolling non-6 with all tokens in base passes turn and leaves consecutiveSixes at 0
+  let fresh = createNewGame('single_player', 'Bob', 'red', 3);
+  fresh = rollDice(fresh, 2, true);
+  assert.equal(fresh.consecutiveSixes, 0);
+  assert.equal(fresh.currentTurn, 'green');
+});
+
+test('restartOnlineRoomGame preserves all human players, sessions, and seats while resetting board', async () => {
+  const { restartOnlineRoomGame } = await import('./ludoEngine.ts');
+  let room = createNewGame('online_room', 'Alice (Host)', 'red', 0, 'ROOM-RESTART');
+  const p2 = addPlayerToOnlineRoom(room, { name: 'Bob', color: 'blue' });
+  if ('state' in p2) room = p2.state;
+  const p3 = addPlayerToOnlineRoom(room, { name: 'Charlie', color: 'yellow' });
+  if ('state' in p3) room = p3.state;
+
+  const started = startOnlineRoomGame(room);
+  if (!('error' in started)) room = started;
+
+  // Simulate some game progress
+  room = rollDice(room, 6);
+  room = moveToken(room, 0);
+  room.tokens.red[0].stepCount = 15;
+  room.tokens.red[0].state = 'track';
+
+  const hostPlayerId = room.players[0].id;
+  const p2Id = 'player' in p2 ? p2.player.id : '';
+  const p3Id = 'player' in p3 ? p3.player.id : '';
+
+  // Restart room
+  const restarted = restartOnlineRoomGame(room);
+
+  // All 3 players preserved with exact same IDs, names, colors
+  assert.equal(restarted.players.length, 3);
+  const alice = restarted.players.find((p) => p.name === 'Alice (Host)')!;
+  const bob = restarted.players.find((p) => p.name === 'Bob')!;
+  const charlie = restarted.players.find((p) => p.name === 'Charlie')!;
+
+  assert.ok(alice && bob && charlie);
+  assert.equal(alice.id, hostPlayerId);
+  assert.equal(bob.id, p2Id);
+  assert.equal(charlie.id, p3Id);
+  assert.equal(alice.color, 'red');
+  assert.equal(bob.color, 'blue');
+  assert.equal(charlie.color, 'yellow');
+
+  // Tokens reset to base
+  assert.equal(restarted.tokens.red[0].state, 'base');
+  assert.equal(restarted.tokens.red[0].stepCount, -1);
+  assert.equal(restarted.diceValue, null);
+  assert.equal(restarted.hasRolled, false);
+  assert.equal(restarted.consecutiveSixes, 0);
+  assert.equal(restarted.status, 'playing');
+  assert.equal(restarted.rankings.length, 0);
+});

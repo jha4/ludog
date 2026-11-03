@@ -2,81 +2,113 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { EmojiEvent, PlayerColor, COLOR_HEX } from '../lib/ludoEngine.js';
 import { sounds } from '../lib/audioEffects.js';
-import { Smile, Send, X, Sparkles } from 'lucide-react';
+import {
+  EMOJI_CATEGORIES,
+  QUICK_MESSAGE_CATEGORIES,
+  QUICK_FAVORITE_REACTIONS,
+} from '../lib/socialInteractions.js';
+import {
+  STICKERS,
+  STICKER_CATEGORIES,
+  getStickerById,
+  StickerCategory,
+} from '../lib/stickers.js';
+import { Smile, Send, X, Sparkles, Flame, MessageSquare, Image as ImageIcon } from 'lucide-react';
 
 interface AnimatedEmojiOverlayProps {
   events: EmojiEvent[];
-  onSendEmoji: (emoji: string, text?: string) => void;
+  onSendEmoji: (emoji: string, text?: string, stickerId?: string) => void;
   playerColor?: PlayerColor;
   disabled?: boolean;
 }
 
-interface FloatingEmojiInstance {
+interface ActivePlayerReaction {
   id: string;
-  emoji: string;
-  text?: string;
   senderName: string;
   senderColor: PlayerColor;
-  startX: number; // percentage 0-100
-  startY: number; // percentage 0-100
-  createdAt: number;
+  emoji: string;
+  text?: string;
+  stickerId?: string;
+  timestamp: number;
 }
-
-// Predefined quick reactions
-export const QUICK_EMOJIS = ['😂', '🔥', '👑', '🥳', '💀', '🎲', '🎯', '⚡', '😭', '👏'];
-
-export const QUICK_MESSAGES = [
-  'Good luck! 🍀',
-  'Nice move! 🎯',
-  'Ouch! 💥',
-  'Almost home! 🏁',
-  'Hurry up! ⏰',
-  'Well played! 👏',
-];
 
 interface QuickEmojiBarProps {
-  onSendEmoji: (emoji: string, text?: string) => void;
+  onSendEmoji: (emoji: string, text?: string, stickerId?: string) => void;
   disabled?: boolean;
 }
+
+type SocialTab = 'emojis' | 'stickers' | 'messages';
 
 export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
   onSendEmoji,
   disabled = false,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [customText, setCustomText] = useState('');
-  const [selectedEmoji, setSelectedEmoji] = useState('😂');
+  const [activeTab, setActiveTab] = useState<SocialTab>('stickers');
+  const [selectedEmojiCategory, setSelectedEmojiCategory] = useState<string>('basic');
+  const [selectedStickerCategory, setSelectedStickerCategory] = useState<StickerCategory>('ludo');
+  const [selectedMsgCategory, setSelectedMsgCategory] = useState<string>('ludo');
 
-  const handleSend = (emoji: string, text?: string) => {
+  const [selectedEmoji, setSelectedEmoji] = useState('🔥');
+  const [selectedStickerId, setSelectedStickerId] = useState<string | undefined>('ludo_six_again');
+  const [customText, setCustomText] = useState('');
+
+  const handleQuickSend = (emoji: string, text?: string, stickerId?: string) => {
     if (disabled) return;
-    sounds.playClick();
-    onSendEmoji(emoji, text);
+    if (stickerId) {
+      sounds.playStickerPop();
+    } else {
+      sounds.playEmojiPop();
+    }
+    onSendEmoji(emoji, text, stickerId);
     if (isOpen) {
       setIsOpen(false);
       setCustomText('');
     }
   };
 
+  const currentSticker = selectedStickerId ? getStickerById(selectedStickerId) : undefined;
+
   return (
     <div className="relative z-30 flex items-center justify-center w-full px-1">
-      {/* Quick Reactions Bar */}
+      {/* Quick Reactions Bar - Exact existing container dimensions */}
       <div className="flex items-center justify-between w-full p-1 sm:p-1.5 rounded-2xl bg-slate-950/80 backdrop-blur-md border border-slate-800 shadow-md">
         <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto scrollbar-none py-0.5">
-          {QUICK_EMOJIS.slice(0, 6).map((emoji) => (
-            <button
-              key={emoji}
-              onClick={() => handleSend(emoji)}
-              disabled={disabled}
-              className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-slate-850 hover:bg-slate-750 active:scale-90 text-lg sm:text-xl transition-all shadow-inner border border-slate-700/60 cursor-pointer disabled:opacity-40 flex-shrink-0"
-              title={`Send ${emoji}`}
-            >
-              <span className="transform hover:scale-125 transition-transform duration-150">
-                {emoji}
-              </span>
-            </button>
-          ))}
+          {QUICK_FAVORITE_REACTIONS.map((item, idx) => {
+            if (item.type === 'sticker') {
+              const sticker = getStickerById(item.value);
+              return (
+                <button
+                  key={`quick-${item.value}-${idx}`}
+                  onClick={() => handleQuickSend('🔥', undefined, item.value)}
+                  disabled={disabled}
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-slate-800/80 hover:bg-slate-700/80 active:scale-90 transition-all shadow-inner border border-amber-500/30 cursor-pointer disabled:opacity-40 flex-shrink-0"
+                  title={`Send ${sticker?.name || item.label}`}
+                >
+                  <div className="transform hover:scale-110 transition-transform duration-150">
+                    {sticker ? sticker.render(22) : '🎲'}
+                  </div>
+                </button>
+              );
+            }
+
+            return (
+              <button
+                key={`quick-emoji-${item.value}-${idx}`}
+                onClick={() => handleQuickSend(item.value)}
+                disabled={disabled}
+                className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-xl bg-slate-800/80 hover:bg-slate-700/80 active:scale-90 text-lg sm:text-xl transition-all shadow-inner border border-slate-700/60 cursor-pointer disabled:opacity-40 flex-shrink-0"
+                title={`Send ${item.value}`}
+              >
+                <span className="transform hover:scale-125 transition-transform duration-150">
+                  {item.value}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
+        {/* Open Extended Social Picker Button */}
         <button
           onClick={() => {
             sounds.playClick();
@@ -89,10 +121,10 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
         </button>
       </div>
 
-      {/* Extended Emoji & Chat Modal */}
+      {/* Extended Emoji & Chat Modal - Exact existing dimensions max-w-[360px] sm:max-w-sm max-h-[85vh] */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm">
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
@@ -100,14 +132,19 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
               className="w-full max-w-[360px] sm:max-w-sm rounded-3xl bg-slate-900 border border-slate-700 shadow-2xl text-slate-100 flex flex-col max-h-[85vh] overflow-hidden"
             >
               {/* Header */}
-              <div className="flex items-center justify-between border-b border-slate-800 p-4 sm:p-5 pb-3 shrink-0">
+              <div className="flex items-center justify-between border-b border-slate-800 p-3.5 sm:p-4 pb-2.5 shrink-0">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400 shrink-0">
-                    <Sparkles className="w-5 h-5" />
+                  <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/30 text-amber-400 border border-amber-500/30 shrink-0">
+                    <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-sm sm:text-base text-white truncate">Reactions & Chat</h3>
-                    <p className="text-[11px] sm:text-xs text-slate-400 truncate">Send animated emojis to all players</p>
+                    <h3 className="font-bold text-sm sm:text-base text-white truncate flex items-center gap-1.5">
+                      <span>Social Reactions</span>
+                      <span className="text-[10px] font-black uppercase px-1.5 py-0.2 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        RAGE
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-slate-400 truncate">Tease, celebrate & react</p>
                   </div>
                 </div>
                 <button
@@ -119,80 +156,235 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
                 </button>
               </div>
 
-              {/* Scrollable Body */}
-              <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-3.5 flex flex-col gap-3.5 sm:gap-4">
-                {/* Emoji Grid */}
-                <div>
-                  <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                    Animated Emojis
-                  </span>
-                  <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-                    {QUICK_EMOJIS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        onClick={() => setSelectedEmoji(emoji)}
-                        className={`h-10 sm:h-12 flex items-center justify-center rounded-2xl text-xl sm:text-2xl border transition-all cursor-pointer ${
-                          selectedEmoji === emoji
-                            ? 'bg-amber-500/30 border-amber-400 scale-105 shadow-md shadow-amber-500/20'
-                            : 'bg-slate-800/80 border-slate-700 hover:bg-slate-800'
-                        }`}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/* Top Navigation Tabs */}
+              <div className="flex items-center p-1.5 mx-3 sm:mx-4 mt-2 bg-slate-950/80 rounded-2xl border border-slate-800 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClick();
+                    setActiveTab('stickers');
+                  }}
+                  className={`flex-1 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    activeTab === 'stickers'
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 shadow-md font-extrabold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Flame className="w-3.5 h-3.5" />
+                  <span>Stickers</span>
+                </button>
 
-                {/* Quick Chat Shoutouts */}
-                <div>
-                  <span className="text-[11px] sm:text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-2">
-                    Quick Shoutouts
-                  </span>
-                  <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                    {QUICK_MESSAGES.map((msg) => (
-                      <button
-                        key={msg}
-                        type="button"
-                        onClick={() => handleSend(selectedEmoji, msg)}
-                        className="px-2.5 sm:px-3 py-2 text-xs font-medium rounded-xl bg-slate-800/70 hover:bg-slate-800 border border-slate-700 text-slate-200 text-left transition-all hover:border-slate-500 truncate cursor-pointer active:scale-98"
-                      >
-                        {msg}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClick();
+                    setActiveTab('emojis');
+                  }}
+                  className={`flex-1 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    activeTab === 'emojis'
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 shadow-md font-extrabold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <Smile className="w-3.5 h-3.5" />
+                  <span>Emojis</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClick();
+                    setActiveTab('messages');
+                  }}
+                  className={`flex-1 py-1.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
+                    activeTab === 'messages'
+                      ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 shadow-md font-extrabold'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Shoutouts</span>
+                </button>
               </div>
 
-              {/* Fixed Footer Custom Message Input */}
-              <div className="p-3.5 sm:p-4 border-t border-slate-800 bg-slate-900/95 shrink-0">
+              {/* Scrollable Body with Category Filters */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-3 sm:px-4 py-2.5 flex flex-col gap-2.5">
+                {/* ================= TAB 1: STICKERS ================= */}
+                {activeTab === 'stickers' && (
+                  <div className="flex flex-col gap-2.5">
+                    {/* Category Filter Pills */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                      {STICKER_CATEGORIES.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setSelectedStickerCategory(cat.id);
+                          }}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 whitespace-nowrap transition-all border ${
+                            selectedStickerCategory === cat.id
+                              ? 'bg-amber-500/25 border-amber-400 text-amber-300 shadow-xs'
+                              : 'bg-slate-800/80 border-slate-700/80 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span>{cat.icon}</span>
+                          <span>{cat.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Stickers Grid */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {STICKERS.filter((s) => s.category === selectedStickerCategory).map((sticker) => (
+                        <button
+                          key={sticker.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedStickerId(sticker.id);
+                            handleQuickSend('🔥', undefined, sticker.id);
+                          }}
+                          className="p-2 rounded-2xl bg-slate-850 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-400/60 flex flex-col items-center justify-center gap-1 transition-all active:scale-95 shadow-sm hover:shadow-md cursor-pointer group"
+                        >
+                          <div className="transform group-hover:scale-110 transition-transform">
+                            {sticker.render(44)}
+                          </div>
+                          <span className="text-[10px] font-black text-amber-300/90 text-center uppercase tracking-tight leading-none mt-1">
+                            {sticker.caption}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ================= TAB 2: EMOJIS ================= */}
+                {activeTab === 'emojis' && (
+                  <div className="flex flex-col gap-2.5">
+                    {/* Category Filter Pills */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                      {EMOJI_CATEGORIES.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setSelectedEmojiCategory(cat.id);
+                          }}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 whitespace-nowrap transition-all border ${
+                            selectedEmojiCategory === cat.id
+                              ? 'bg-amber-500/25 border-amber-400 text-amber-300 shadow-xs'
+                              : 'bg-slate-800/80 border-slate-700/80 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span>{cat.icon}</span>
+                          <span>{cat.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Emojis Grid */}
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {EMOJI_CATEGORIES.find((c) => c.id === selectedEmojiCategory)?.emojis.map((emoji) => (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => {
+                            setSelectedEmoji(emoji);
+                            setSelectedStickerId(undefined);
+                            handleQuickSend(emoji);
+                          }}
+                          className={`h-11 flex items-center justify-center rounded-xl text-2xl border transition-all cursor-pointer ${
+                            selectedEmoji === emoji && !selectedStickerId
+                              ? 'bg-amber-500/30 border-amber-400 scale-105 shadow-md shadow-amber-500/20'
+                              : 'bg-slate-800/70 border-slate-700/80 hover:bg-slate-750'
+                          }`}
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ================= TAB 3: QUICK SHOUTOUTS ================= */}
+                {activeTab === 'messages' && (
+                  <div className="flex flex-col gap-2.5">
+                    {/* Category Filter Pills */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+                      {QUICK_MESSAGE_CATEGORIES.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => {
+                            sounds.playClick();
+                            setSelectedMsgCategory(cat.id);
+                          }}
+                          className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 whitespace-nowrap transition-all border ${
+                            selectedMsgCategory === cat.id
+                              ? 'bg-amber-500/25 border-amber-400 text-amber-300 shadow-xs'
+                              : 'bg-slate-800/80 border-slate-700/80 text-slate-400 hover:text-white'
+                          }`}
+                        >
+                          <span>{cat.icon}</span>
+                          <span>{cat.label}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Messages List */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {QUICK_MESSAGE_CATEGORIES.find((c) => c.id === selectedMsgCategory)?.messages.map((msg) => (
+                        <button
+                          key={msg}
+                          type="button"
+                          onClick={() => {
+                            handleQuickSend(selectedEmoji, msg, selectedStickerId);
+                          }}
+                          className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-800/80 hover:bg-slate-750 border border-slate-700 text-slate-200 text-left transition-all hover:border-amber-400/60 truncate cursor-pointer active:scale-98 flex items-center justify-between"
+                        >
+                          <span className="truncate">{msg}</span>
+                          <Send className="w-3 h-3 text-slate-500 opacity-60 ml-1 shrink-0" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Fixed Footer Custom Message & Send Input */}
+              <div className="p-3 sm:p-3.5 border-t border-slate-800 bg-slate-900/95 shrink-0">
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (customText.trim() || selectedEmoji) {
-                      handleSend(selectedEmoji, customText.trim() || undefined);
+                    if (customText.trim() || selectedEmoji || selectedStickerId) {
+                      handleQuickSend(
+                        selectedEmoji,
+                        customText.trim() || undefined,
+                        selectedStickerId
+                      );
                     }
                   }}
                   className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-950/80 border border-slate-700 focus-within:border-amber-400 focus-within:ring-1 focus-within:ring-amber-400/50 transition-all w-full box-border"
                 >
-                  <div 
-                    className="w-9 h-9 shrink-0 flex items-center justify-center text-xl rounded-xl bg-slate-800/90 border border-slate-700/80 select-none"
-                    title={`Selected: ${selectedEmoji}`}
+                  <div
+                    className="w-9 h-9 shrink-0 flex items-center justify-center rounded-xl bg-slate-800/90 border border-slate-700/80 select-none overflow-hidden"
+                    title={currentSticker ? currentSticker.name : selectedEmoji}
                   >
-                    {selectedEmoji}
+                    {currentSticker ? currentSticker.render(24) : <span className="text-xl">{selectedEmoji}</span>}
                   </div>
                   <input
                     type="text"
                     value={customText}
                     onChange={(e) => setCustomText(e.target.value)}
-                    placeholder="Type a reaction..."
+                    placeholder="Type a reaction message..."
                     maxLength={40}
                     className="flex-1 min-w-0 bg-transparent px-2.5 py-1.5 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none"
                   />
                   <button
                     type="submit"
                     disabled={disabled}
-                    className="w-9 h-9 shrink-0 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-95 text-slate-950 font-bold transition-all shadow-md shadow-amber-500/25 cursor-pointer flex items-center justify-center disabled:opacity-40"
+                    className="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 active:scale-95 text-slate-950 font-bold transition-all shadow-md shadow-amber-500/25 cursor-pointer flex items-center justify-center disabled:opacity-40"
                     title="Send reaction"
                   >
                     <Send className="w-4 h-4 text-slate-950" />
@@ -210,114 +402,133 @@ export const QuickEmojiBar: React.FC<QuickEmojiBarProps> = ({
 export const AnimatedEmojiOverlay: React.FC<AnimatedEmojiOverlayProps> = ({
   events,
 }) => {
-  const [activeFloating, setActiveFloating] = useState<FloatingEmojiInstance[]>([]);
+  // Map of active reactions by player color to prevent overlapping and guarantee independent player anchoring
+  const [activeReactions, setActiveReactions] = useState<Record<PlayerColor, ActivePlayerReaction | null>>({
+    red: null,
+    green: null,
+    blue: null,
+    yellow: null,
+  });
 
-  // Handle new incoming emoji events
+  // Handle incoming reaction events
   useEffect(() => {
     if (events.length === 0) return;
     const latest = events[events.length - 1];
+    const color = latest.senderColor;
+    if (!color) return;
 
-    // Determine origin coordinates based on sender color
-    let startX = 50;
-    let startY = 50;
-    if (latest.senderColor === 'red') {
-      startX = 20;
-      startY = 80;
-    } else if (latest.senderColor === 'blue') {
-      startX = 80;
-      startY = 80;
-    } else if (latest.senderColor === 'yellow') {
-      startX = 80;
-      startY = 20;
-    } else if (latest.senderColor === 'green') {
-      startX = 20;
-      startY = 20;
-    }
-
-    // Add random slight jitter to avoid exact overlap
-    startX += (Math.random() - 0.5) * 12;
-    startY += (Math.random() - 0.5) * 8;
-
-    const instance: FloatingEmojiInstance = {
+    const reaction: ActivePlayerReaction = {
       id: latest.id,
+      senderName: latest.senderName,
+      senderColor: color,
       emoji: latest.emoji,
       text: latest.text,
-      senderName: latest.senderName,
-      senderColor: latest.senderColor,
-      startX,
-      startY,
-      createdAt: Date.now(),
+      stickerId: latest.stickerId,
+      timestamp: Date.now(),
     };
 
-    sounds.playEmojiPop();
+    if (latest.stickerId) {
+      sounds.playStickerPop();
+    } else {
+      sounds.playEmojiPop();
+    }
 
-    setActiveFloating((prev) => [...prev.slice(-8), instance]);
+    setActiveReactions((prev) => ({
+      ...prev,
+      [color]: reaction,
+    }));
 
+    // Auto cleanup after 2.8s
     const timer = setTimeout(() => {
-      setActiveFloating((prev) => prev.filter((item) => item.id !== instance.id));
+      setActiveReactions((prev) => {
+        if (prev[color]?.id === reaction.id) {
+          return { ...prev, [color]: null };
+        }
+        return prev;
+      });
     }, 2800);
 
     return () => clearTimeout(timer);
   }, [events]);
 
+  // Player station anchor position coordinates (relative to viewport, anchored near 4 stations)
+  const stationAnchors: Record<PlayerColor, string> = {
+    red: 'top-14 left-4 sm:top-16 sm:left-10',
+    green: 'top-14 right-4 sm:top-16 sm:right-10 items-end',
+    blue: 'bottom-20 left-4 sm:bottom-22 sm:left-10',
+    yellow: 'bottom-20 right-4 sm:bottom-22 sm:right-10 items-end',
+  };
+
   return (
     <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
-      <AnimatePresence>
-        {activeFloating.map((item) => {
-          const colorTheme = COLOR_HEX[item.senderColor] || COLOR_HEX.red;
-          return (
+      {(['red', 'green', 'blue', 'yellow'] as PlayerColor[]).map((color) => {
+        const reaction = activeReactions[color];
+        if (!reaction) return null;
+
+        const colorTheme = COLOR_HEX[color] || COLOR_HEX.red;
+        const sticker = reaction.stickerId ? getStickerById(reaction.stickerId) : undefined;
+        const isRightSide = color === 'green' || color === 'yellow';
+
+        return (
+          <div
+            key={reaction.id}
+            className={`absolute flex flex-col ${stationAnchors[color]} transition-all duration-300 max-w-[200px] sm:max-w-[240px]`}
+          >
             <motion.div
-              key={item.id}
-              initial={{
-                opacity: 0,
-                scale: 0.2,
-                x: `${item.startX}vw`,
-                y: `${item.startY}vh`,
-              }}
+              initial={{ opacity: 0, scale: 0.3, y: 15 }}
               animate={{
                 opacity: [0, 1, 1, 0],
-                scale: [0.3, 1.4, 1.2, 0.8],
-                x: [`${item.startX}vw`, `${item.startX + (Math.random() - 0.5) * 16}vw`],
-                y: [`${item.startY}vh`, `${item.startY - 22}vh`],
-                rotate: [0, -12, 12, -6, 0],
+                scale: [0.3, 1.15, 1, 0.85],
+                y: [15, -4, 0, -8],
               }}
-              exit={{ opacity: 0, scale: 0.5 }}
-              transition={{ duration: 2.6, ease: 'easeOut' }}
-              className="absolute flex flex-col items-center"
+              transition={{ duration: 2.7, times: [0, 0.15, 0.85, 1], ease: 'easeOut' }}
+              className={`flex flex-col ${isRightSide ? 'items-end text-right' : 'items-start text-left'}`}
             >
-              {/* Glow ring */}
-              <div className="relative flex items-center justify-center">
+              {/* Sticker or Large Emoji Pop */}
+              <div className="relative flex items-center justify-center p-1">
+                {/* Aura Glow */}
                 <div
-                  className="absolute -inset-2 rounded-full blur-md opacity-70 animate-pulse"
+                  className="absolute -inset-1.5 rounded-full blur-md opacity-60 animate-pulse pointer-events-none"
                   style={{ backgroundColor: colorTheme.primary }}
                 />
-                <div className="relative text-5xl md:text-6xl drop-shadow-xl select-none filter">
-                  {item.emoji}
-                </div>
-              </div>
 
-              {/* Sender badge and optional text */}
-              <motion.div
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-1 flex flex-col items-center"
-              >
-                <span
-                  className="px-2 py-0.5 text-xs font-bold rounded-full shadow-lg text-white border border-white/20"
-                  style={{ backgroundColor: colorTheme.primary }}
-                >
-                  {item.senderName}
-                </span>
-                {item.text && (
-                  <div className="mt-1 max-w-[200px] rounded-xl bg-slate-900/90 px-3 py-1.5 text-center text-xs font-semibold text-white shadow-xl backdrop-blur-md border border-slate-700/80">
-                    "{item.text}"
+                {sticker ? (
+                  <div className="relative p-1.5 rounded-2xl bg-slate-900/90 border-2 shadow-2xl backdrop-blur-md" style={{ borderColor: colorTheme.primary }}>
+                    {sticker.render(56)}
+                    <span
+                      className="block text-[9px] font-black uppercase text-center mt-0.5 px-1 rounded-sm text-white"
+                      style={{ backgroundColor: colorTheme.primary }}
+                    >
+                      {sticker.caption}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="relative text-4xl sm:text-5xl drop-shadow-2xl select-none filter">
+                    {reaction.emoji}
                   </div>
                 )}
-              </motion.div>
+              </div>
+
+              {/* Speech Bubble (if text provided) */}
+              {reaction.text && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className={`mt-1 px-3 py-1.5 rounded-2xl bg-slate-900/95 border shadow-xl backdrop-blur-md text-xs sm:text-sm font-bold text-white relative ${
+                    isRightSide ? 'rounded-tr-xs' : 'rounded-tl-xs'
+                  }`}
+                  style={{ borderColor: colorTheme.primary }}
+                >
+                  <span className="block text-[9px] font-extrabold uppercase opacity-80" style={{ color: colorTheme.primary }}>
+                    {reaction.senderName}
+                  </span>
+                  <span>{reaction.text}</span>
+                </motion.div>
+              )}
             </motion.div>
-          );
-        })}
-      </AnimatePresence>
+          </div>
+        );
+      })}
     </div>
   );
 };

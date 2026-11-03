@@ -1,0 +1,16 @@
+{
+  "name": "Ludo Rage",
+  "short_name": "Ludo Rage",
+  "description": "Play Ludo Rage with friends, challenge bots, and turn every match into a competitive battle.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#090d16",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

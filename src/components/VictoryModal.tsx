@@ -82,14 +82,14 @@ export const VictoryModal: React.FC<VictoryModalProps> = ({
           </div>
 
           <span className="text-xs font-black uppercase tracking-widest text-amber-400 flex items-center gap-1">
-            <Sparkles className="w-3.5 h-3.5" /> Ludo Champion!
+            <Sparkles className="w-3.5 h-3.5" /> Ludo Rage Champion!
           </span>
           <h2 className="text-2xl font-black text-white mt-1">
             {winnerPlayer?.name} Won!
           </h2>
           <p className="text-xs text-slate-400 mt-1">
             {winnerPlayer?.type === 'bot'
-              ? 'The AI Bot claimed the royal crown this round!'
+              ? 'The AI Bot claimed victory in the rage arena this round!'
               : 'Flawless strategy! All tokens reached home safely.'}
           </p>
 

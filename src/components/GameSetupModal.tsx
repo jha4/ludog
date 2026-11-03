@@ -62,7 +62,7 @@ export const GameSetupModal: React.FC<GameSetupModalProps> = ({
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-white">Ludo Game Setup</h2>
+                <h2 className="text-lg font-black text-white">Ludo Rage Game Setup</h2>
                 <p className="text-xs text-slate-400">Choose game mode, color and players</p>
               </div>
             </div>

@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" width="240" height="60" fill="none">
+  <!-- Brand Icon -->
+  <g transform="translate(6, 6)">
+    <rect width="48" height="48" rx="12" fill="#090D16" stroke="#FF4500" stroke-width="1.5" stroke-opacity="0.5" />
+    <rect x="6" y="6" width="16" height="16" rx="4.5" fill="#EF4444" />
+    <rect x="26" y="6" width="16" height="16" rx="4.5" fill="#10B981" />
+    <rect x="6" y="26" width="16" height="16" rx="4.5" fill="#3B82F6" />
+    <rect x="26" y="26" width="16" height="16" rx="4.5" fill="#F59E0B" />
+    <circle cx="14" cy="14" r="3" fill="#FFFFFF" fill-opacity="0.95" />
+    <circle cx="34" cy="14" r="3" fill="#FFFFFF" fill-opacity="0.95" />
+    <circle cx="14" cy="34" r="3" fill="#FFFFFF" fill-opacity="0.95" />
+    <circle cx="34" cy="34" r="3" fill="#FFFFFF" fill-opacity="0.95" />
+    <!-- Center rage badge -->
+    <rect x="15" y="15" width="18" height="18" rx="5" fill="#0B1020" stroke="#FF4500" stroke-width="1.5" />
+    <path d="M24 18C24 18 20 22 20 25C20 27.5 21.8 29.5 24 29.5C26.2 29.5 28 27.5 28 25C28 23.5 26.8 22.5 26.5 21C26 22.5 25 23.5 24 23.5C23.2 23.5 22.8 22.8 24 18Z" fill="url(#brandFlame)" />
+  </g>
+
+  <!-- Typography: LUDO RAGE -->
+  <text x="68" y="34" font-family="'Outfit', sans-serif" font-weight="900" font-size="24" fill="#FFFFFF" letter-spacing="0.5">LUDO</text>
+  <text x="142" y="34" font-family="'Outfit', sans-serif" font-weight="900" font-size="24" fill="url(#brandFlame)" letter-spacing="1">RAGE</text>
+  
+  <!-- Subtitle Tagline -->
+  <text x="68" y="48" font-family="'Fredoka', sans-serif" font-weight="600" font-size="10.5" fill="#FF8A00" letter-spacing="1.2">ROLL. RULE. RAGE.</text>
+
+  <defs>
+    <linearGradient id="brandFlame" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#FF9900" />
+      <stop offset="50%" stop-color="#FF4500" />
+      <stop offset="100%" stop-color="#EF4444" />
+    </linearGradient>
+  </defs>
+</svg>

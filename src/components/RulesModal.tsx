@@ -27,7 +27,7 @@ export const RulesModal: React.FC<RulesModalProps> = ({ isOpen, onClose }) => {
                 <BookOpen className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-white">How to Play Ludo</h2>
+                <h2 className="text-lg font-black text-white">How to Play Ludo Rage</h2>
                 <p className="text-xs text-slate-400">Classic rules & winning tactics</p>
               </div>
             </div>

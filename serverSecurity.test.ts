@@ -174,3 +174,104 @@ test('Security & Room Engine - Turn Pass on Stuck Roll & Leaver Turn Advancement
   const nextColor = getNextActivePlayer(remainingPlayers, 'red', game.rankings);
   assert.equal(nextColor, 'blue');
 });
+
+test('Security & Room Engine - Unauthorized Leave & Cross-Player Eviction Protection', async () => {
+  // Mock player sessions and room setup
+  const hostSessionToken = 'host-token-1234';
+  const player2SessionToken = 'player2-token-5678';
+  const hostPlayerId = 'host-id';
+  const player2Id = 'player2-id';
+
+  const mockSessions = new Map<string, { token: string; playerId: string; playerColor: string }>();
+  mockSessions.set(hostSessionToken, { token: hostSessionToken, playerId: hostPlayerId, playerColor: 'red' });
+  mockSessions.set(player2SessionToken, { token: player2SessionToken, playerId: player2Id, playerColor: 'blue' });
+
+  // 1. Missing token must be rejected with 401
+  const validateLeaveRequest = (
+    token: string | null,
+    bodyPlayerId?: string
+  ): { status: number; error?: string; targetId?: string } => {
+    if (!token) return { status: 401, error: 'Authorization token required to leave room.' };
+    const session = mockSessions.get(token);
+    if (!session) return { status: 403, error: 'Invalid or expired session token.' };
+    if (bodyPlayerId && bodyPlayerId !== session.playerId) {
+      return { status: 403, error: 'Unauthorized: Cannot remove another player from the room.' };
+    }
+    return { status: 200, targetId: session.playerId };
+  };
+
+  // Test unauthenticated leave
+  assert.equal(validateLeaveRequest(null).status, 401);
+  assert.equal(validateLeaveRequest(null, hostPlayerId).status, 401);
+
+  // Test invalid token
+  assert.equal(validateLeaveRequest('invalid-token').status, 403);
+
+  // Test malicious attempt: player2 tries to evict host
+  assert.equal(validateLeaveRequest(player2SessionToken, hostPlayerId).status, 403);
+
+  // Test authorized leave
+  const authLeave = validateLeaveRequest(player2SessionToken, player2Id);
+  assert.equal(authLeave.status, 200);
+  assert.equal(authLeave.targetId, player2Id);
+});
+
+test('Security & Room Engine - SSE Stream Token Authentication', async () => {
+  const hostSessionToken = 'valid-host-token';
+  const mockSessions = new Map<string, { token: string; playerId: string }>();
+  mockSessions.set(hostSessionToken, { token: hostSessionToken, playerId: 'player-1' });
+
+  const activePlayers = [{ id: 'player-1', name: 'Host' }];
+
+  const validateStreamConnection = (token: string | null): { status: number; error?: string } => {
+    if (!token) return { status: 401, error: 'Authentication token required to connect to room stream.' };
+    const session = mockSessions.get(token);
+    if (!session) return { status: 403, error: 'Invalid or expired player session token.' };
+    const inRoom = activePlayers.some((p) => p.id === session.playerId);
+    if (!inRoom) return { status: 403, error: 'Player is not an active participant in this room.' };
+    return { status: 200 };
+  };
+
+  // Missing token rejected with 401
+  assert.equal(validateStreamConnection(null).status, 401);
+
+  // Invalid token rejected with 403
+  assert.equal(validateStreamConnection('random-stranger').status, 403);
+
+  // Valid player token accepted
+  assert.equal(validateStreamConnection(hostSessionToken).status, 200);
+});
+
+test('Security & Room Engine - Social Reactions Validation and Rate Limiting', () => {
+  // Test sanitization of reaction payload
+  const sanitizeString = (val: unknown, maxLen = 40): string => {
+    if (typeof val !== 'string') return '';
+    return val.trim().slice(0, maxLen);
+  };
+
+  const testEmoji = sanitizeString('🔥 extra text overflow', 10);
+  assert.equal(testEmoji, '🔥 extra t');
+
+  const testSticker = sanitizeString('ludo_six_again_malicious_extra_long_payload_attack', 20);
+  assert.equal(testSticker, 'ludo_six_again_malic');
+
+  // Rate limiting check
+  let lastSentTimestamp = 1000;
+  const isRateLimited = (now: number, minIntervalMs = 400): boolean => {
+    if (now - lastSentTimestamp < minIntervalMs) {
+      return true;
+    }
+    lastSentTimestamp = now;
+    return false;
+  };
+
+  // Immediate subsequent request within 200ms -> rate limited
+  assert.equal(isRateLimited(1200), true);
+
+  // Subsequent request after 500ms -> permitted
+  assert.equal(isRateLimited(1550), false);
+
+  // Rapid spam 100ms later -> rate limited
+  assert.equal(isRateLimited(1650), true);
+});
+

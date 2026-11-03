@@ -1,5 +1,5 @@
 /**
- * Web Audio API Sound Synthesizer for Ludo Royal
+ * Web Audio API Sound Synthesizer for Ludo Rage
  * Generates arcade-quality procedural sound effects without external audio files.
  */
 
@@ -327,6 +327,33 @@ class SoundController {
 
     osc.start(now);
     osc.stop(now + 0.1);
+  }
+
+  /**
+   * Sound: Cartoon Sticker Pop / Boing
+   */
+  public playStickerPop() {
+    if (this.isMuted) return;
+    const ctx = this.initCtx();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(840, now + 0.06);
+    osc.frequency.exponentialRampToValueAtTime(560, now + 0.12);
+
+    gain.gain.setValueAtTime(0.24 * this.volume, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.15);
   }
 
   /**

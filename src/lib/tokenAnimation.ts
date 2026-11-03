@@ -122,3 +122,19 @@ export function calculateHopPosition(
     shadowScale,
   };
 }
+
+/**
+ * Calculates the per-step duration in milliseconds, compressing steps if total
+ * sequence duration would exceed maxTotalDurationMs.
+ */
+export function calculateStepDuration(
+  stepCount: number,
+  config: TokenAnimationConfig,
+  anticipationMs: number = 50
+): number {
+  if (stepCount <= 0) return config.stepDurationMs;
+  const availableMs = config.maxTotalDurationMs - anticipationMs - config.landingDurationMs;
+  const maxPerStep = Math.floor(availableMs / stepCount);
+  return Math.max(70, Math.min(config.stepDurationMs, maxPerStep));
+}
+

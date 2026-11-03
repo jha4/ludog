@@ -14,6 +14,7 @@ import {
   getNextActivePlayer,
   addPlayerToOnlineRoom,
   startOnlineRoomGame,
+  restartOnlineRoomGame,
   EmojiEvent,
 } from './src/lib/ludoEngine.js';
 
@@ -90,6 +91,7 @@ interface RoomEntry {
   hostToken: string;
   lastActive: number;
   botTimer: NodeJS.Timeout | null;
+  turnGeneration: number;
 }
 
 const MAX_ROOMS = 100;
@@ -98,6 +100,19 @@ const rooms = new Map<string, RoomEntry>();
 const PASS_DELAY_MS = 1200;
 const passTimers = new Map<string, NodeJS.Timeout>();
 
+function clearRoomTimers(roomId: string, room: RoomEntry) {
+  if (room.botTimer) {
+    clearTimeout(room.botTimer);
+    room.botTimer = null;
+  }
+  const passT = passTimers.get(roomId);
+  if (passT) {
+    clearTimeout(passT);
+    passTimers.delete(roomId);
+  }
+  room.turnGeneration++;
+}
+
 function schedulePassIfNoMoves(roomId: string) {
   const room = rooms.get(roomId);
   if (!room) return;
@@ -105,12 +120,13 @@ function schedulePassIfNoMoves(roomId: string) {
   const stuck = s.status === 'playing' && s.hasRolled && s.movableTokenIds.length === 0;
   if (!stuck || passTimers.has(roomId)) return;
 
+  const currentGen = room.turnGeneration;
   passTimers.set(
     roomId,
     setTimeout(() => {
       passTimers.delete(roomId);
       const r = rooms.get(roomId);
-      if (!r) return;
+      if (!r || r.turnGeneration !== currentGen) return;
       const cur = r.state;
       if (cur.status !== 'playing' || !cur.hasRolled || cur.movableTokenIds.length > 0) return;
       r.state = passTurn(cur);
@@ -238,29 +254,35 @@ function scheduleBotTurnIfNeeded(roomId: string) {
 
   if (room.botTimer) {
     clearTimeout(room.botTimer);
+    room.botTimer = null;
   }
+
+  const currentGen = room.turnGeneration;
 
   // Phase 1: Bot rolls dice
   if (!room.state.hasRolled) {
     room.botTimer = setTimeout(() => {
       const currentRoom = rooms.get(roomId);
-      if (!currentRoom || currentRoom.state.status !== 'playing') return;
+      if (!currentRoom || currentRoom.turnGeneration !== currentGen || currentRoom.state.status !== 'playing') return;
 
       const player = getCurrentPlayer(currentRoom.state);
       if (!player || player.type !== 'bot') return;
 
       broadcastToRoom(roomId, { type: 'bot_rolling', payload: { color: player.color } });
 
-      setTimeout(() => {
+      currentRoom.botTimer = setTimeout(() => {
         const activeRoom = rooms.get(roomId);
-        if (!activeRoom) return;
+        if (!activeRoom || activeRoom.turnGeneration !== currentGen || activeRoom.state.status !== 'playing') return;
+
+        const p = getCurrentPlayer(activeRoom.state);
+        if (!p || p.type !== 'bot') return;
 
         const rolledState = rollDice(activeRoom.state);
         activeRoom.state = rolledState;
         activeRoom.lastActive = Date.now();
 
         if (rolledState.diceValue === 6 && Math.random() < 0.6) {
-          triggerBotEmoji(roomId, player.color, 'roll6');
+          triggerBotEmoji(roomId, p.color, 'roll6');
         }
 
         broadcastToRoom(roomId, { type: 'state_update', payload: rolledState });
@@ -275,7 +297,7 @@ function scheduleBotTurnIfNeeded(roomId: string) {
   if (room.state.hasRolled && room.state.movableTokenIds.length > 0) {
     room.botTimer = setTimeout(() => {
       const activeRoom = rooms.get(roomId);
-      if (!activeRoom || activeRoom.state.status !== 'playing') return;
+      if (!activeRoom || activeRoom.turnGeneration !== currentGen || activeRoom.state.status !== 'playing') return;
 
       const player = getCurrentPlayer(activeRoom.state);
       if (!player || player.type !== 'bot') return;
@@ -426,6 +448,7 @@ app.post('/api/rooms', (req: Request, res: Response) => {
     hostToken,
     lastActive: Date.now(),
     botTimer: null,
+    turnGeneration: 0,
   });
 
   if (initialGame.status === 'playing') {
@@ -597,42 +620,55 @@ app.post('/api/rooms/:roomId/leave', (req: Request, res: Response) => {
   }
 
   const token = extractPlayerToken(req);
-  const session = token ? room.playerSessions.get(token) : null;
-  const targetPlayerId = session ? session.playerId : req.body?.playerId;
-
-  if (!targetPlayerId) {
-    return res.status(400).json({ error: 'Player ID or valid token required to leave.' });
+  if (!token) {
+    return res.status(401).json({ error: 'Authorization token required to leave room.' });
   }
 
-  if (token) {
-    room.playerSessions.delete(token);
+  const session = room.playerSessions.get(token);
+  if (!session) {
+    return res.status(403).json({ error: 'Invalid or expired session token.' });
   }
+
+  // Prevent cross-player eviction if a target playerId is also passed in the body
+  if (req.body?.playerId && req.body.playerId !== session.playerId) {
+    return res.status(403).json({ error: 'Unauthorized: Cannot remove another player from the room.' });
+  }
+
+  const targetPlayerId = session.playerId;
+  room.playerSessions.delete(token);
 
   const leaver = room.state.players.find((p) => p.id === targetPlayerId);
+  if (!leaver) {
+    return res.status(404).json({ error: 'Player not found in room.' });
+  }
+
   const remainingPlayers = room.state.players.filter((p) => p.id !== targetPlayerId);
 
+  // Clear timers and advance turn generation so active timeouts do not fire
+  clearRoomTimers(roomId, room);
+
   if (remainingPlayers.length === 0) {
-    if (room.botTimer) clearTimeout(room.botTimer);
-    const passT = passTimers.get(roomId);
-    if (passT) {
-      clearTimeout(passT);
-      passTimers.delete(roomId);
+    for (const client of room.clients) {
+      try {
+        client.end();
+      } catch {}
     }
+    room.clients.clear();
     rooms.delete(roomId);
     return res.json({ success: true, roomClosed: true });
   }
 
   // Update host token if host left
   if (token === room.hostToken) {
-    const newHostSession = Array.from(room.playerSessions.values()).find(
-      (s) => s.playerId === remainingPlayers[0].id
-    );
-    if (newHostSession) {
-      room.hostToken = newHostSession.token;
+    const nextHostSession = Array.from(room.playerSessions.values()).find(
+      (s) => remainingPlayers.some((p) => p.id === s.playerId && p.type === 'human')
+    ) || Array.from(room.playerSessions.values())[0];
+    if (nextHostSession) {
+      room.hostToken = nextHostSession.token;
     }
   }
 
-  const isLeaverTurn = leaver && room.state.currentTurn === leaver.color;
+  const isLeaverTurn = room.state.currentTurn === leaver.color;
   const nextTurnColor = isLeaverTurn
     ? getNextActivePlayer(remainingPlayers, leaver.color, room.state.rankings)
     : remainingPlayers.some((p) => p.color === room.state.currentTurn)
@@ -658,7 +694,9 @@ app.post('/api/rooms/:roomId/leave', (req: Request, res: Response) => {
   };
   room.lastActive = Date.now();
   broadcastToRoom(roomId, { type: 'state_update', payload: room.state });
-  scheduleBotTurnIfNeeded(roomId);
+  if (room.state.status === 'playing') {
+    scheduleBotTurnIfNeeded(roomId);
+  }
   res.json({ success: true, state: room.state });
 });
 
@@ -694,6 +732,8 @@ app.post('/api/rooms/:roomId/roll', (req: Request, res: Response) => {
   if (currentP && session.playerColor !== currentP.color) {
     return res.status(403).json({ error: `It is currently ${currentP.name}'s turn (${currentP.color.toUpperCase()}).` });
   }
+
+  clearRoomTimers(roomId, room);
 
   // Authoritative Dice Roll using Crypto Random
   const rolledValue = crypto.randomInt(1, 7);
@@ -742,6 +782,8 @@ app.post('/api/rooms/:roomId/move', (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Illegal token move for current dice roll.' });
   }
 
+  clearRoomTimers(roomId, room);
+
   const newState = moveToken(room.state, tokenId);
   room.state = newState;
   room.lastActive = Date.now();
@@ -772,11 +814,20 @@ app.post('/api/rooms/:roomId/emoji', (req: Request, res: Response) => {
     return res.status(403).json({ error: 'Invalid player session token.' });
   }
 
+  // Rate limit: prevent spamming reactions (minimum 400ms interval per player)
+  const lastSent = (session as any).lastEmojiTimestamp || 0;
+  const now = Date.now();
+  if (now - lastSent < 400) {
+    return res.status(429).json({ error: 'Please wait a moment before sending another reaction.' });
+  }
+  (session as any).lastEmojiTimestamp = now;
+
   const senderPlayer = room.state.players.find((p) => p.id === session.playerId);
-  const { emoji = '🎉', text } = req.body || {};
+  const { emoji = '🎉', text, stickerId } = req.body || {};
 
   const sanitizedEmoji = sanitizeString(emoji, 10) || '🎉';
   const sanitizedText = text ? sanitizeString(text, 100) : undefined;
+  const sanitizedStickerId = stickerId ? sanitizeString(stickerId, 40) : undefined;
 
   const emojiEvent: EmojiEvent = {
     id: 'emoji-' + crypto.randomBytes(4).toString('hex'),
@@ -785,7 +836,8 @@ app.post('/api/rooms/:roomId/emoji', (req: Request, res: Response) => {
     senderColor: session.playerColor,
     emoji: sanitizedEmoji,
     text: sanitizedText,
-    timestamp: Date.now(),
+    stickerId: sanitizedStickerId,
+    timestamp: now,
   };
 
   broadcastToRoom(roomId, { type: 'emoji', payload: emojiEvent });
@@ -803,19 +855,32 @@ app.post('/api/rooms/:roomId/restart', (req: Request, res: Response) => {
   if (!room) return res.status(404).json({ error: 'Room not found' });
 
   const token = extractPlayerToken(req);
-  if (!token || token !== room.hostToken) {
+  if (!token) {
+    return res.status(401).json({ error: 'Authorization token required.' });
+  }
+
+  if (token !== room.hostToken) {
     return res.status(403).json({ error: 'Only the room host can restart the match.' });
   }
 
-  const firstHuman = room.state.players.find((p) => p.type === 'human') || room.state.players[0];
-  const botCount = room.state.players.filter((p) => p.type === 'bot').length;
+  clearRoomTimers(roomId, room);
 
-  const restarted = createNewGame(room.state.mode, firstHuman.name, firstHuman.color, botCount, roomId);
+  let restarted: GameState;
+  if (room.state.mode === 'online_room') {
+    restarted = restartOnlineRoomGame(room.state);
+  } else {
+    const firstHuman = room.state.players.find((p) => p.type === 'human') || room.state.players[0];
+    const botCount = room.state.players.filter((p) => p.type === 'bot').length;
+    restarted = createNewGame(room.state.mode, firstHuman.name, firstHuman.color, botCount, roomId);
+  }
+
   room.state = restarted;
   room.lastActive = Date.now();
 
   broadcastToRoom(roomId, { type: 'state_update', payload: restarted });
-  scheduleBotTurnIfNeeded(roomId);
+  if (restarted.status === 'playing') {
+    scheduleBotTurnIfNeeded(roomId);
+  }
 
   res.json(restarted);
 });
@@ -830,6 +895,21 @@ app.get('/api/rooms/:roomId/stream', (req: Request, res: Response) => {
   const room = rooms.get(roomId);
   if (!room) {
     return res.status(404).json({ error: 'Room not found' });
+  }
+
+  const token = extractPlayerToken(req);
+  if (!token) {
+    return res.status(401).json({ error: 'Authentication token required to connect to room stream.' });
+  }
+
+  const session = room.playerSessions.get(token);
+  if (!session) {
+    return res.status(403).json({ error: 'Invalid or expired player session token.' });
+  }
+
+  const isPlayerInRoom = room.state.players.some((p) => p.id === session.playerId);
+  if (!isPlayerInRoom) {
+    return res.status(403).json({ error: 'Player is not an active participant in this room.' });
   }
 
   if (room.clients.size >= 10) {
@@ -884,7 +964,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Ludo Royal Production Server listening on http://0.0.0.0:${PORT}`);
+    console.log(`Ludo Rage Production Server listening on http://0.0.0.0:${PORT}`);
   });
 }
 

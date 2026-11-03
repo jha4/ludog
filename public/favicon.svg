@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" fill="none">
+  <!-- Rounded Base Plate -->
+  <rect width="64" height="64" rx="16" fill="#090D16" />
+  
+  <!-- Outer Glow Ring -->
+  <rect x="2" y="2" width="60" height="60" rx="14" stroke="#FF4500" stroke-width="1.5" stroke-opacity="0.4" />
+
+  <!-- 4 Colored Player Quadrants -->
+  <rect x="8" y="8" width="22" height="22" rx="6" fill="#EF4444" />
+  <rect x="34" y="8" width="22" height="22" rx="6" fill="#10B981" />
+  <rect x="8" y="34" width="22" height="22" rx="6" fill="#3B82F6" />
+  <rect x="34" y="34" width="22" height="22" rx="6" fill="#F59E0B" />
+
+  <!-- Quadrant Inner Token Pips -->
+  <circle cx="19" cy="19" r="4.5" fill="#FFFFFF" fill-opacity="0.95" />
+  <circle cx="45" cy="19" r="4.5" fill="#FFFFFF" fill-opacity="0.95" />
+  <circle cx="19" cy="45" r="4.5" fill="#FFFFFF" fill-opacity="0.95" />
+  <circle cx="45" cy="45" r="4.5" fill="#FFFFFF" fill-opacity="0.95" />
+
+  <!-- Center Rage Emblem / Fiery Dice Shield -->
+  <rect x="20" y="20" width="24" height="24" rx="7" fill="#0B1020" stroke="#FF4500" stroke-width="2" />
+  
+  <!-- Stylized Flame & Energy Spark inside Center -->
+  <path d="M32 23C32 23 27 28 27 32C27 35.3137 29.2386 38 32 38C34.7614 38 37 35.3137 37 32C37 30 35.5 28.5 35 27C34.5 29 33 30 32 30C31 30 30.5 29 32 23Z" fill="url(#rageFlameGrad)" />
+  <circle cx="32" cy="35" r="1.5" fill="#FDE047" />
+
+  <defs>
+    <linearGradient id="rageFlameGrad" x1="27" y1="23" x2="37" y2="38" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFD700" />
+      <stop offset="45%" stop-color="#FF5500" />
+      <stop offset="100%" stop-color="#EF4444" />
+    </linearGradient>
+  </defs>
+</svg>
