@@ -75,9 +75,9 @@ export const SharedDiceControl: React.FC<SharedDiceControlProps> = React.memo(({
             value={lastDiceValue}
             isRolling={isRolling}
             canRoll={canRoll && !hasRolled && !isBotTurn}
-            onRoll={onRoll}
+            onRoll={handleControlClick}
             color={activePlayer.color}
-            size="sm"
+            size="md"
           />
         </div>
       </motion.div>

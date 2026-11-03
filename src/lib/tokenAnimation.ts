@@ -10,19 +10,19 @@ export interface TokenAnimationConfig {
 }
 
 export const DEFAULT_ANIMATION_CONFIG: TokenAnimationConfig = {
-  stepDurationMs: 90,
-  spawnDurationMs: 220,
-  captureDurationMs: 250,
-  homeDurationMs: 260,
-  maxTotalDurationMs: 520,
+  stepDurationMs: 140,
+  spawnDurationMs: 260,
+  captureDurationMs: 340,
+  homeDurationMs: 300,
+  maxTotalDurationMs: 1200,
 };
 
 export const FAST_ANIMATION_CONFIG: TokenAnimationConfig = {
-  stepDurationMs: 55,
-  spawnDurationMs: 150,
-  captureDurationMs: 180,
-  homeDurationMs: 180,
-  maxTotalDurationMs: 320,
+  stepDurationMs: 80,
+  spawnDurationMs: 160,
+  captureDurationMs: 220,
+  homeDurationMs: 200,
+  maxTotalDurationMs: 600,
 };
 
 /**

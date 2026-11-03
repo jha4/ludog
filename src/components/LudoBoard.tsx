@@ -42,6 +42,7 @@ interface VisualToken {
   arcOffsetPx: number;
   scale: number;
   isAnimating: boolean;
+  hopDurationMs?: number;
 }
 
 /**
@@ -425,122 +426,294 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
   useEffect(() => {
     const isReducedMotion = isReducedMotionPreferred();
 
-    // Check each participating color's tokens
+    // Collect all token changes
+    const changes: Array<{
+      color: PlayerColor;
+      token: Token;
+      startStep: number;
+      targetStep: number;
+      key: string;
+      isCaptureKickback: boolean;
+      isSpawning: boolean;
+    }> = [];
+
     activeColors.forEach((color) => {
       const serverTokens = tokens[color] || [];
-
       serverTokens.forEach((token) => {
         const key = `${color}-${token.id}`;
         const currentVisual = visualTokens[key];
         if (!currentVisual) return;
+        if (token.stepCount !== currentVisual.stepCount) {
+          changes.push({
+            color,
+            token,
+            startStep: currentVisual.stepCount,
+            targetStep: token.stepCount,
+            key,
+            isCaptureKickback: token.stepCount === -1 && currentVisual.stepCount !== -1,
+            isSpawning: currentVisual.stepCount === -1 && token.stepCount === 0,
+          });
+        }
+      });
+    });
 
-        const startStep = currentVisual.stepCount;
-        const targetStep = token.stepCount;
+    if (changes.length === 0) return;
 
-        // If logical step changed, run sequential path animation!
-        if (targetStep !== startStep) {
-          const path = generateTokenPath(startStep, targetStep);
+    // If reduced motion is preferred, immediately snap all tokens
+    if (isReducedMotion) {
+      setVisualTokens((prev) => {
+        const next = { ...prev };
+        changes.forEach(({ color, token, targetStep, key }) => {
+          const finalCoord = getTokenBoardPercent(color, token.id, targetStep, 0, 1);
+          next[key] = {
+            ...next[key],
+            stepCount: targetStep,
+            left: finalCoord.left,
+            top: finalCoord.top,
+            arcOffsetPx: 0,
+            scale: 1,
+            isAnimating: false,
+            hopDurationMs: 0,
+          };
+        });
+        return next;
+      });
+      return;
+    }
 
-          // If reduced motion is preferred or path is single direct teleport, snap immediately
-          if (isReducedMotion || path.length <= 1) {
-            const finalCoord = getTokenBoardPercent(color, token.id, targetStep, 0, 1);
+    // Mark animation active across the board
+    if (!isCurrentlyAnimatingRef.current) {
+      isCurrentlyAnimatingRef.current = true;
+      onAnimationStateChange?.(true);
+    }
+
+    // Separate forward-moving tokens from capture kickbacks
+    const forwardItems = changes.filter((c) => !c.isCaptureKickback);
+    const captureItems = changes.filter((c) => c.isCaptureKickback);
+
+    // Calculate maximum duration of forward movement for capture sequencing
+    let maxForwardDuration = 0;
+    forwardItems.forEach((item) => {
+      if (item.isSpawning) {
+        maxForwardDuration = Math.max(maxForwardDuration, animConfig.spawnDurationMs);
+      } else {
+        const stepCount = Math.max(1, item.targetStep - item.startStep);
+        const duration = 80 + stepCount * animConfig.stepDurationMs; // 80ms anticipation + steps
+        maxForwardDuration = Math.max(maxForwardDuration, duration);
+      }
+    });
+
+    let pendingAnimations = changes.length;
+    const checkAllComplete = () => {
+      pendingAnimations -= 1;
+      if (pendingAnimations <= 0) {
+        isCurrentlyAnimatingRef.current = false;
+        onAnimationStateChange?.(false);
+      }
+    };
+
+    // 1. Animate forward moving / spawning tokens
+    forwardItems.forEach((item) => {
+      const { color, token, startStep, targetStep, key, isSpawning } = item;
+      const path = generateTokenPath(startStep, targetStep);
+
+      if (isSpawning) {
+        // Deployment from base: lift out, arc over to starting square
+        sounds.playSpawn();
+        const hopDuration = animConfig.spawnDurationMs;
+
+        // Lift out of pit
+        setVisualTokens((prev) => ({
+          ...prev,
+          [key]: {
+            ...prev[key],
+            arcOffsetPx: -8,
+            scale: 1.15,
+            isAnimating: true,
+            hopDurationMs: hopDuration,
+          },
+        }));
+
+        const spawnTimer = setTimeout(() => {
+          const startCoord = getTokenBoardPercent(color, token.id, 0, 0, 1);
+          setVisualTokens((prev) => ({
+            ...prev,
+            [key]: {
+              ...prev[key],
+              stepCount: 0,
+              left: startCoord.left,
+              top: startCoord.top,
+              arcOffsetPx: 1.5,
+              scale: 0.95,
+              isAnimating: true,
+            },
+          }));
+
+          const settleTimer = setTimeout(() => {
             setVisualTokens((prev) => ({
               ...prev,
               [key]: {
                 ...prev[key],
-                stepCount: targetStep,
-                left: finalCoord.left,
-                top: finalCoord.top,
                 arcOffsetPx: 0,
-                scale: 1,
+                scale: 1.0,
                 isAnimating: false,
               },
             }));
-            return;
-          }
+            checkAllComplete();
+          }, 80);
 
-          // Mark animation active
-          if (!isCurrentlyAnimatingRef.current) {
-            isCurrentlyAnimatingRef.current = true;
-            onAnimationStateChange?.(true);
-          }
+          activeTimersRef.current.push(settleTimer);
+        }, hopDuration * 0.7);
 
-          // Step-by-step path hop traversal
-          const isSpawning = startStep === -1 && targetStep === 0;
-          const isCaptureKickback = targetStep === -1;
-          const hopDuration = isSpawning
-            ? animConfig.spawnDurationMs
-            : isCaptureKickback
-            ? animConfig.captureDurationMs
-            : animConfig.stepDurationMs;
+        activeTimersRef.current.push(spawnTimer);
+        return;
+      }
 
-          // Sound triggers
-          if (isSpawning) {
-            sounds.playSpawn();
-          } else if (isCaptureKickback) {
-            sounds.playCapture();
-          }
+      // Normal intermediate step hopping traversal
+      const hopDuration = animConfig.stepDurationMs;
+      const anticipationMs = 70;
 
-          // Schedule step hops sequentially
-          path.slice(1).forEach((stepNum, idx) => {
-            const timer = setTimeout(() => {
-              const targetCoord = getTokenBoardPercent(color, token.id, stepNum, 0, 1);
+      // Phase 1: Subtle anticipation lift before starting forward movement
+      setVisualTokens((prev) => ({
+        ...prev,
+        [key]: {
+          ...prev[key],
+          arcOffsetPx: -4,
+          scale: 1.08,
+          isAnimating: true,
+          hopDurationMs: hopDuration,
+        },
+      }));
 
-              // Play marimba step sound for forward track progress
-              if (!isSpawning && !isCaptureKickback) {
-                sounds.playStep(stepNum);
-              }
+      // Phase 2: Traverse each intermediate square sequentially
+      path.slice(1).forEach((stepNum, idx) => {
+        const stepTimer = setTimeout(() => {
+          const targetCoord = getTokenBoardPercent(color, token.id, stepNum, 0, 1);
+          sounds.playStep(stepNum);
 
-              // Hop peak effect
-              setVisualTokens((prev) => ({
-                ...prev,
-                [key]: {
-                  ...prev[key],
-                  stepCount: stepNum,
-                  left: targetCoord.left,
-                  top: targetCoord.top,
-                  arcOffsetPx: -7,
-                  scale: 1.15,
-                  isAnimating: true,
-                },
-              }));
+          // Hop peak over this square
+          setVisualTokens((prev) => ({
+            ...prev,
+            [key]: {
+              ...prev[key],
+              stepCount: stepNum,
+              left: targetCoord.left,
+              top: targetCoord.top,
+              arcOffsetPx: -7,
+              scale: 1.14,
+              isAnimating: true,
+              hopDurationMs: hopDuration,
+            },
+          }));
 
-              // Land effect after brief peak
-              const landTimer = setTimeout(() => {
+          // Landing squash & settle
+          const squashTimer = setTimeout(() => {
+            const isFinalStep = idx === path.length - 2;
+            setVisualTokens((prev) => ({
+              ...prev,
+              [key]: {
+                ...prev[key],
+                arcOffsetPx: isFinalStep ? 1 : 0,
+                scale: isFinalStep ? 0.96 : 1.0,
+                isAnimating: !isFinalStep,
+              },
+            }));
+
+            // Settle final step
+            if (isFinalStep) {
+              const finalSettleTimer = setTimeout(() => {
                 setVisualTokens((prev) => ({
                   ...prev,
                   [key]: {
                     ...prev[key],
                     arcOffsetPx: 0,
                     scale: 1.0,
-                    isAnimating: idx < path.length - 2,
+                    isAnimating: false,
                   },
                 }));
 
-                // If final step reached:
-                if (idx === path.length - 2) {
-                  isCurrentlyAnimatingRef.current = false;
-                  onAnimationStateChange?.(false);
-
-                  // Landing special events
-                  if (stepNum === 56) {
-                    sounds.playHome();
-                  } else if (stepNum >= 0 && stepNum <= 50) {
-                    const trackPos = getTrackPosition(color, stepNum);
-                    if (trackPos !== null && SAFE_TRACK_POSITIONS.has(trackPos)) {
-                      sounds.playSafeZone();
-                    }
+                // Landing special sound effects
+                if (stepNum === 56) {
+                  sounds.playHome();
+                } else if (stepNum >= 0 && stepNum <= 50) {
+                  const trackPos = getTrackPosition(color, stepNum);
+                  if (trackPos !== null && SAFE_TRACK_POSITIONS.has(trackPos)) {
+                    sounds.playSafeZone();
                   }
                 }
-              }, hopDuration * 0.45);
 
-              activeTimersRef.current.push(landTimer);
-            }, idx * hopDuration);
+                checkAllComplete();
+              }, 60);
 
-            activeTimersRef.current.push(timer);
-          });
-        }
+              activeTimersRef.current.push(finalSettleTimer);
+            }
+          }, hopDuration * 0.6);
+
+          activeTimersRef.current.push(squashTimer);
+        }, anticipationMs + idx * hopDuration);
+
+        activeTimersRef.current.push(stepTimer);
       });
+    });
+
+    // 2. Animate captured tokens returning to base (sequenced to begin after attacking token lands!)
+    captureItems.forEach((item) => {
+      const { color, token, key } = item;
+      const kickbackDelay = maxForwardDuration > 0 ? maxForwardDuration + 60 : 0;
+      const kickDuration = animConfig.captureDurationMs;
+
+      const captureTimer = setTimeout(() => {
+        sounds.playCapture();
+
+        // Brief impact shudder at destination square
+        setVisualTokens((prev) => ({
+          ...prev,
+          [key]: {
+            ...prev[key],
+            arcOffsetPx: -3,
+            scale: 0.9,
+            isAnimating: true,
+            hopDurationMs: kickDuration,
+          },
+        }));
+
+        const flyBackTimer = setTimeout(() => {
+          const baseCoord = getTokenBoardPercent(color, token.id, -1, 0, 1);
+
+          // Fly back arc towards base
+          setVisualTokens((prev) => ({
+            ...prev,
+            [key]: {
+              ...prev[key],
+              stepCount: -1,
+              left: baseCoord.left,
+              top: baseCoord.top,
+              arcOffsetPx: -10,
+              scale: 1.15,
+              isAnimating: true,
+            },
+          }));
+
+          const settleTimer = setTimeout(() => {
+            setVisualTokens((prev) => ({
+              ...prev,
+              [key]: {
+                ...prev[key],
+                arcOffsetPx: 0,
+                scale: 1.0,
+                isAnimating: false,
+              },
+            }));
+            checkAllComplete();
+          }, kickDuration * 0.7);
+
+          activeTimersRef.current.push(settleTimer);
+        }, 80);
+
+        activeTimersRef.current.push(flyBackTimer);
+      }, kickbackDelay);
+
+      activeTimersRef.current.push(captureTimer);
     });
   }, [tokens, activeColors, animConfig, onAnimationStateChange]);
 
@@ -652,14 +825,15 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                 token.color,
                 token.id,
                 visual ? visual.stepCount : token.stepCount,
-                stackIndex,
-                stackTotal
+                visual?.isAnimating ? 0 : stackIndex,
+                visual?.isAnimating ? 1 : stackTotal
               );
 
               const leftVal = visual ? visual.left : coords.left;
               const topVal = visual ? visual.top : coords.top;
               const arcOffset = visual ? visual.arcOffsetPx : 0;
               const scaleVal = visual ? visual.scale : 1.0;
+              const hopDuration = visual?.hopDurationMs || animConfig.stepDurationMs;
 
               const colorTheme = COLOR_HEX[token.color] || COLOR_HEX.red;
 
@@ -673,11 +847,12 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                     height: `${TOKEN_DIAMETER_PCT}%`,
                     transform: `translate3d(0, ${arcOffset}px, 0) scale(${scaleVal})`,
                     transition: visual?.isAnimating
-                      ? 'left 70ms linear, top 70ms linear, transform 70ms ease-out'
-                      : 'transform 150ms ease-out',
+                      ? `left ${hopDuration}ms cubic-bezier(0.25, 1, 0.5, 1), top ${hopDuration}ms cubic-bezier(0.25, 1, 0.5, 1), transform ${Math.round(hopDuration * 0.5)}ms ease-out`
+                      : 'transform 200ms ease-out',
                     willChange: visual?.isAnimating ? 'transform, left, top' : 'auto',
+                    zIndex: visual?.isAnimating ? 50 : 30 + stackIndex,
                   }}
-                  className={`absolute rounded-full flex items-center justify-center z-30 ${
+                  className={`absolute rounded-full flex items-center justify-center ${
                     isMovable && isCurrentPlayerTurn
                       ? 'pointer-events-auto cursor-pointer'
                       : 'pointer-events-none'
@@ -700,12 +875,13 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                     isMovable ? ' (Click to move)' : ''
                   }`}
                 >
-                  {/* Contact Shadow Underneath (lifts during hop) */}
+                  {/* Physical Dynamic Contact Shadow Underneath (lifts during hop, darkens on landing) */}
                   <div
-                    className="absolute -bottom-1 w-[80%] h-1.5 rounded-full bg-black/60 blur-[1px] pointer-events-none transition-all"
+                    className="absolute -bottom-1 w-[80%] h-1.5 rounded-full bg-black/70 pointer-events-none transition-all"
                     style={{
-                      transform: `scale(${arcOffset < -2 ? 1.3 : 1})`,
-                      opacity: arcOffset < -2 ? 0.35 : 0.65,
+                      transform: `scale(${arcOffset < -2 ? 1.25 : arcOffset > 0 ? 0.92 : 1})`,
+                      opacity: arcOffset < -2 ? 0.35 : arcOffset > 0 ? 0.8 : 0.65,
+                      filter: arcOffset < -2 ? 'blur(2px)' : 'blur(0.5px)',
                     }}
                   />
 
