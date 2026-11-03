@@ -75,27 +75,40 @@ export const DICE_PIP_POSITIONS: Record<number, Array<[number, number]>> = {
 };
 
 /**
- * Calculates continuous tumbling target angles to prevent backward flipping
- * when spinning across multiple turns.
+ * Calculates continuous tumbling target angles to guarantee forward multi-axis rotation
+ * without backward flipping or angular discontinuity across multiple rolls.
  */
 export function calculateRollAngles(
   targetValue: number,
   prevRotations: DiceRotation,
-  turns: number = 3
+  turns: number = 2
 ): DiceRotation {
   const base = DICE_FACE_ANGLES[targetValue] || DICE_FACE_ANGLES[1];
 
-  // Add multiples of 360 to smoothly spin in the positive forward direction
-  const xTurns = turns * 360;
-  const yTurns = turns * 360;
+  // Target angle modulo 360 [0..359]
+  const targetModX = ((base.rotateX % 360) + 360) % 360;
+  const targetModY = ((base.rotateY % 360) + 360) % 360;
 
-  // Find next nearest multiple of 360 that is greater than current rotation
-  const nextX = Math.ceil(prevRotations.rotateX / 360) * 360 + xTurns + base.rotateX;
-  const nextY = Math.ceil(prevRotations.rotateY / 360) * 360 + yTurns + base.rotateY;
+  // Current angle modulo 360 [0..359]
+  const currentModX = ((prevRotations.rotateX % 360) + 360) % 360;
+  const currentModY = ((prevRotations.rotateY % 360) + 360) % 360;
+
+  // Calculate forward rotation delta along X axis
+  let deltaX = targetModX - currentModX;
+  if (turns > 0 && deltaX <= 0) deltaX += 360;
+  if (turns === 0 && deltaX < 0) deltaX += 360;
+
+  // Calculate forward rotation delta along Y axis
+  let deltaY = targetModY - currentModY;
+  if (turns > 0 && deltaY <= 0) deltaY += 360;
+  if (turns === 0 && deltaY < 0) deltaY += 360;
+
+  const nextX = prevRotations.rotateX + deltaX + turns * 360;
+  const nextY = prevRotations.rotateY + deltaY + turns * 360;
 
   return {
     rotateX: nextX,
     rotateY: nextY,
-    rotateZ: base.rotateZ,
+    rotateZ: 0,
   };
 }

@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateTokenPath, calculateHopPosition } from './tokenAnimation.ts';
+import {
+  generateTokenPath,
+  calculateHopPosition,
+  DEFAULT_ANIMATION_CONFIG,
+  FAST_ANIMATION_CONFIG,
+} from './tokenAnimation.ts';
 
 test('Token Animation - Generates correct step sequences', () => {
   // Deploy from base
@@ -52,4 +57,15 @@ test('Token Animation - Reduced motion compliance', () => {
   const mid = calculateHopPosition(fromCoord, toCoord, 0.5, true);
   assert.equal(mid.arcOffsetPx, 0);
   assert.equal(mid.scale, 1);
+});
+
+test('Token Animation - Configuration constants match refined specifications', () => {
+  // Verify default settings align with 160-190ms per square and 5-7px hop
+  assert.ok(DEFAULT_ANIMATION_CONFIG.stepDurationMs >= 160 && DEFAULT_ANIMATION_CONFIG.stepDurationMs <= 190);
+  assert.ok(DEFAULT_ANIMATION_CONFIG.hopHeightPx >= 5 && DEFAULT_ANIMATION_CONFIG.hopHeightPx <= 7);
+  assert.ok(DEFAULT_ANIMATION_CONFIG.peakScale >= 1.05 && DEFAULT_ANIMATION_CONFIG.peakScale <= 1.08);
+  assert.ok(DEFAULT_ANIMATION_CONFIG.landingDurationMs >= 50 && DEFAULT_ANIMATION_CONFIG.landingDurationMs <= 80);
+
+  // Fast mode is suitably faster for snappy bot moves
+  assert.ok(FAST_ANIMATION_CONFIG.stepDurationMs < DEFAULT_ANIMATION_CONFIG.stepDurationMs);
 });

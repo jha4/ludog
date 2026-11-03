@@ -1,5 +1,4 @@
-import { PlayerColor, getTrackPosition } from './ludoEngine.js';
-import { getTokenBoardPercent, GridCoord } from './boardCoordinates.js';
+import { PlayerColor } from './ludoEngine.js';
 
 export interface TokenAnimationConfig {
   stepDurationMs: number;
@@ -7,22 +6,31 @@ export interface TokenAnimationConfig {
   captureDurationMs: number;
   homeDurationMs: number;
   maxTotalDurationMs: number;
+  hopHeightPx: number;
+  peakScale: number;
+  landingDurationMs: number;
 }
 
 export const DEFAULT_ANIMATION_CONFIG: TokenAnimationConfig = {
-  stepDurationMs: 140,
-  spawnDurationMs: 260,
-  captureDurationMs: 340,
-  homeDurationMs: 300,
-  maxTotalDurationMs: 1200,
+  stepDurationMs: 175,
+  spawnDurationMs: 280,
+  captureDurationMs: 380,
+  homeDurationMs: 320,
+  maxTotalDurationMs: 1400,
+  hopHeightPx: 6,
+  peakScale: 1.07,
+  landingDurationMs: 60,
 };
 
 export const FAST_ANIMATION_CONFIG: TokenAnimationConfig = {
-  stepDurationMs: 80,
-  spawnDurationMs: 160,
-  captureDurationMs: 220,
-  homeDurationMs: 200,
-  maxTotalDurationMs: 600,
+  stepDurationMs: 110,
+  spawnDurationMs: 180,
+  captureDurationMs: 240,
+  homeDurationMs: 220,
+  maxTotalDurationMs: 800,
+  hopHeightPx: 5,
+  peakScale: 1.05,
+  landingDurationMs: 40,
 };
 
 /**
@@ -67,7 +75,7 @@ export function generateTokenPath(fromStep: number, toStep: number): number[] {
 
 /**
  * Calculate the interpolated visual position of a token during movement.
- * Includes a parabolic hop height (arc) and scale effect.
+ * Includes a parabolic hop height (arc) and subtle scale effect.
  */
 export interface VisualTokenPosition {
   leftPct: number;
@@ -81,7 +89,9 @@ export function calculateHopPosition(
   fromCoord: { left: number; top: number },
   toCoord: { left: number; top: number },
   progress: number, // 0 to 1
-  isReducedMotion: boolean = false
+  isReducedMotion: boolean = false,
+  hopHeightPx: number = 6,
+  peakScale: number = 1.07
 ): VisualTokenPosition {
   if (isReducedMotion) {
     const currentCoord = progress >= 1 ? toCoord : fromCoord;
@@ -100,9 +110,9 @@ export function calculateHopPosition(
 
   // Parabolic vertical arc: 4 * progress * (1 - progress) peaks at 1.0 when progress = 0.5
   const arcFactor = 4 * progress * (1 - progress);
-  const arcOffsetPx = arcFactor === 0 ? 0 : -arcFactor * 10; // 10px hop peak
-  const scale = 1 + arcFactor * 0.18; // 1.18x peak scale during hop
-  const shadowScale = 1 + arcFactor * 0.35;
+  const arcOffsetPx = arcFactor === 0 ? 0 : -arcFactor * hopHeightPx;
+  const scale = 1 + arcFactor * (peakScale - 1);
+  const shadowScale = 1 + arcFactor * 0.15;
 
   return {
     leftPct,

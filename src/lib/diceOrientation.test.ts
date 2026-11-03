@@ -63,3 +63,23 @@ test('3D Dice - calculateRollAngles continuously increments rotation without rev
   assert.ok(roll2.rotateX > roll1.rotateX);
   assert.ok(roll2.rotateY > roll1.rotateY);
 });
+
+test('3D Dice - calculateRollAngles aligns modulo 360 with base face angles for all values 1..6', () => {
+  let currentRot = { rotateX: 45, rotateY: 60, rotateZ: 0 };
+  for (let face = 1; face <= 6; face++) {
+    const rolled = calculateRollAngles(face, currentRot, 2);
+    const expected = DICE_FACE_ANGLES[face];
+
+    const actualModX = ((rolled.rotateX % 360) + 360) % 360;
+    const actualModY = ((rolled.rotateY % 360) + 360) % 360;
+    const expectedModX = ((expected.rotateX % 360) + 360) % 360;
+    const expectedModY = ((expected.rotateY % 360) + 360) % 360;
+
+    assert.equal(actualModX, expectedModX, `Face ${face} rotateX modulo mismatch`);
+    assert.equal(actualModY, expectedModY, `Face ${face} rotateY modulo mismatch`);
+    assert.ok(rolled.rotateX > currentRot.rotateX, `Face ${face} did not rotate forward in X`);
+    assert.ok(rolled.rotateY > currentRot.rotateY, `Face ${face} did not rotate forward in Y`);
+
+    currentRot = rolled;
+  }
+});

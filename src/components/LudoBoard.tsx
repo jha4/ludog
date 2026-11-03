@@ -410,19 +410,74 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
     return initial;
   });
 
-  // Track active animation queues and timer IDs
-  const activeTimersRef = useRef<NodeJS.Timeout[]>([]);
+  // Track active animation timers and token sequence IDs
+  const timerSetRef = useRef<Set<NodeJS.Timeout>>(new Set());
+  const tokenAnimSeqRef = useRef<Map<string, number>>(new Map());
+  const animatingTokensRef = useRef<Set<string>>(new Set());
   const isCurrentlyAnimatingRef = useRef(false);
+  const prevGameIdRef = useRef<string>(gameState.id);
+
+  // Helper to safely schedule a timeout and track it in the active set
+  const safeTimeout = useCallback((fn: () => void, delayMs: number): NodeJS.Timeout => {
+    let timer: NodeJS.Timeout;
+    timer = setTimeout(() => {
+      timerSetRef.current.delete(timer);
+      fn();
+    }, delayMs);
+    timerSetRef.current.add(timer);
+    return timer;
+  }, []);
+
+  // Helper to clear all active animation timers
+  const clearAllAnimationTimers = useCallback(() => {
+    timerSetRef.current.forEach(clearTimeout);
+    timerSetRef.current.clear();
+  }, []);
 
   // Clear timers on unmount
   useEffect(() => {
     return () => {
-      activeTimersRef.current.forEach(clearTimeout);
-      activeTimersRef.current = [];
+      clearAllAnimationTimers();
+      animatingTokensRef.current.clear();
     };
-  }, []);
+  }, [clearAllAnimationTimers]);
 
-  // Sync / Animate Tokens when gameState updates (works for local AND online multiplayer!)
+  // Handle game reset / room change
+  useEffect(() => {
+    if (gameState.id !== prevGameIdRef.current || gameState.status === 'waiting') {
+      prevGameIdRef.current = gameState.id;
+      clearAllAnimationTimers();
+      tokenAnimSeqRef.current.clear();
+      animatingTokensRef.current.clear();
+
+      if (isCurrentlyAnimatingRef.current) {
+        isCurrentlyAnimatingRef.current = false;
+        onAnimationStateChange?.(false);
+      }
+
+      // Re-align all visual tokens to authoritative positions
+      const resetMap: Record<string, VisualToken> = {};
+      COLOR_ORDER.forEach((c) => {
+        const colorTokens = tokens[c] || [];
+        colorTokens.forEach((t) => {
+          const coord = getTokenBoardPercent(c, t.id, t.stepCount, 0, 1);
+          resetMap[`${c}-${t.id}`] = {
+            color: c,
+            tokenId: t.id,
+            stepCount: t.stepCount,
+            left: coord.left,
+            top: coord.top,
+            arcOffsetPx: 0,
+            scale: 1,
+            isAnimating: false,
+          };
+        });
+      });
+      setVisualTokens(resetMap);
+    }
+  }, [gameState.id, gameState.status, tokens, clearAllAnimationTimers, onAnimationStateChange]);
+
+  // Sync / Animate Tokens when gameState updates (works for local AND online multiplayer)
   useEffect(() => {
     const isReducedMotion = isReducedMotionPreferred();
 
@@ -459,7 +514,7 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
 
     if (changes.length === 0) return;
 
-    // If reduced motion is preferred, immediately snap all tokens
+    // If reduced motion is preferred, immediately snap all tokens without delay
     if (isReducedMotion) {
       setVisualTokens((prev) => {
         const next = { ...prev };
@@ -478,18 +533,34 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         });
         return next;
       });
-      return;
-    }
 
-    // Mark animation active across the board
-    if (!isCurrentlyAnimatingRef.current) {
-      isCurrentlyAnimatingRef.current = true;
-      onAnimationStateChange?.(true);
+      if (isCurrentlyAnimatingRef.current) {
+        isCurrentlyAnimatingRef.current = false;
+        animatingTokensRef.current.clear();
+        onAnimationStateChange?.(false);
+      }
+      return;
     }
 
     // Separate forward-moving tokens from capture kickbacks
     const forwardItems = changes.filter((c) => !c.isCaptureKickback);
     const captureItems = changes.filter((c) => c.isCaptureKickback);
+
+    // Register active tokens
+    changes.forEach((c) => animatingTokensRef.current.add(c.key));
+
+    if (!isCurrentlyAnimatingRef.current) {
+      isCurrentlyAnimatingRef.current = true;
+      onAnimationStateChange?.(true);
+    }
+
+    const checkTokenDone = (tokenKey: string) => {
+      animatingTokensRef.current.delete(tokenKey);
+      if (animatingTokensRef.current.size === 0) {
+        isCurrentlyAnimatingRef.current = false;
+        onAnimationStateChange?.(false);
+      }
+    };
 
     // Calculate maximum duration of forward movement for capture sequencing
     let maxForwardDuration = 0;
@@ -498,43 +569,39 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
         maxForwardDuration = Math.max(maxForwardDuration, animConfig.spawnDurationMs);
       } else {
         const stepCount = Math.max(1, item.targetStep - item.startStep);
-        const duration = 80 + stepCount * animConfig.stepDurationMs; // 80ms anticipation + steps
+        const duration = 60 + stepCount * animConfig.stepDurationMs;
         maxForwardDuration = Math.max(maxForwardDuration, duration);
       }
     });
-
-    let pendingAnimations = changes.length;
-    const checkAllComplete = () => {
-      pendingAnimations -= 1;
-      if (pendingAnimations <= 0) {
-        isCurrentlyAnimatingRef.current = false;
-        onAnimationStateChange?.(false);
-      }
-    };
 
     // 1. Animate forward moving / spawning tokens
     forwardItems.forEach((item) => {
       const { color, token, startStep, targetStep, key, isSpawning } = item;
       const path = generateTokenPath(startStep, targetStep);
 
+      // Increment sequence ID for this token to invalidate any previous stale timers
+      const seq = (tokenAnimSeqRef.current.get(key) || 0) + 1;
+      tokenAnimSeqRef.current.set(key, seq);
+
       if (isSpawning) {
-        // Deployment from base: lift out, arc over to starting square
+        // Deployment from base: smooth lift out of pit, arc over to starting square (step 0)
         sounds.playSpawn();
         const hopDuration = animConfig.spawnDurationMs;
 
-        // Lift out of pit
+        // Lift out of base pit
         setVisualTokens((prev) => ({
           ...prev,
           [key]: {
             ...prev[key],
             arcOffsetPx: -8,
-            scale: 1.15,
+            scale: 1.12,
             isAnimating: true,
             hopDurationMs: hopDuration,
           },
         }));
 
-        const spawnTimer = setTimeout(() => {
+        safeTimeout(() => {
+          if (tokenAnimSeqRef.current.get(key) !== seq) return;
           const startCoord = getTokenBoardPercent(color, token.id, 0, 0, 1);
           setVisualTokens((prev) => ({
             ...prev,
@@ -543,13 +610,14 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
               stepCount: 0,
               left: startCoord.left,
               top: startCoord.top,
-              arcOffsetPx: 1.5,
-              scale: 0.95,
+              arcOffsetPx: 0.8,
+              scale: 0.98,
               isAnimating: true,
             },
           }));
 
-          const settleTimer = setTimeout(() => {
+          safeTimeout(() => {
+            if (tokenAnimSeqRef.current.get(key) !== seq) return;
             setVisualTokens((prev) => ({
               ...prev,
               [key]: {
@@ -559,39 +627,40 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                 isAnimating: false,
               },
             }));
-            checkAllComplete();
-          }, 80);
+            checkTokenDone(key);
+          }, animConfig.landingDurationMs);
+        }, Math.round(hopDuration * 0.7));
 
-          activeTimersRef.current.push(settleTimer);
-        }, hopDuration * 0.7);
-
-        activeTimersRef.current.push(spawnTimer);
         return;
       }
 
-      // Normal intermediate step hopping traversal
-      const hopDuration = animConfig.stepDurationMs;
-      const anticipationMs = 70;
+      // Step-by-step traversal through each intermediate square
+      const stepDuration = animConfig.stepDurationMs;
+      const anticipationMs = 50;
 
-      // Phase 1: Subtle anticipation lift before starting forward movement
+      // Anticipation lift
       setVisualTokens((prev) => ({
         ...prev,
         [key]: {
           ...prev[key],
-          arcOffsetPx: -4,
-          scale: 1.08,
+          arcOffsetPx: -3,
+          scale: 1.04,
           isAnimating: true,
-          hopDurationMs: hopDuration,
+          hopDurationMs: stepDuration,
         },
       }));
 
-      // Phase 2: Traverse each intermediate square sequentially
-      path.slice(1).forEach((stepNum, idx) => {
-        const stepTimer = setTimeout(() => {
+      // Traverse each intermediate square strictly in sequence
+      const intermediateSteps = path.slice(1);
+      intermediateSteps.forEach((stepNum, idx) => {
+        const isFinalStep = idx === intermediateSteps.length - 1;
+
+        safeTimeout(() => {
+          if (tokenAnimSeqRef.current.get(key) !== seq) return;
           const targetCoord = getTokenBoardPercent(color, token.id, stepNum, 0, 1);
           sounds.playStep(stepNum);
 
-          // Hop peak over this square
+          // Peak of the hop over current square
           setVisualTokens((prev) => ({
             ...prev,
             [key]: {
@@ -599,29 +668,30 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
               stepCount: stepNum,
               left: targetCoord.left,
               top: targetCoord.top,
-              arcOffsetPx: -7,
-              scale: 1.14,
+              arcOffsetPx: -animConfig.hopHeightPx,
+              scale: animConfig.peakScale,
               isAnimating: true,
-              hopDurationMs: hopDuration,
+              hopDurationMs: stepDuration,
             },
           }));
 
-          // Landing squash & settle
-          const squashTimer = setTimeout(() => {
-            const isFinalStep = idx === path.length - 2;
+          // Landing contact and subtle squash
+          safeTimeout(() => {
+            if (tokenAnimSeqRef.current.get(key) !== seq) return;
             setVisualTokens((prev) => ({
               ...prev,
               [key]: {
                 ...prev[key],
-                arcOffsetPx: isFinalStep ? 1 : 0,
-                scale: isFinalStep ? 0.96 : 1.0,
+                arcOffsetPx: 0.7,
+                scale: 0.98,
                 isAnimating: !isFinalStep,
               },
             }));
 
-            // Settle final step
+            // Final square settle and special audio cues
             if (isFinalStep) {
-              const finalSettleTimer = setTimeout(() => {
+              safeTimeout(() => {
+                if (tokenAnimSeqRef.current.get(key) !== seq) return;
                 setVisualTokens((prev) => ({
                   ...prev,
                   [key]: {
@@ -632,7 +702,6 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                   },
                 }));
 
-                // Landing special sound effects
                 if (stepNum === 56) {
                   sounds.playHome();
                 } else if (stepNum >= 0 && stepNum <= 50) {
@@ -642,17 +711,11 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                   }
                 }
 
-                checkAllComplete();
-              }, 60);
-
-              activeTimersRef.current.push(finalSettleTimer);
+                checkTokenDone(key);
+              }, animConfig.landingDurationMs);
             }
-          }, hopDuration * 0.6);
-
-          activeTimersRef.current.push(squashTimer);
-        }, anticipationMs + idx * hopDuration);
-
-        activeTimersRef.current.push(stepTimer);
+          }, Math.round(stepDuration * 0.65));
+        }, anticipationMs + idx * stepDuration);
       });
     });
 
@@ -662,7 +725,11 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
       const kickbackDelay = maxForwardDuration > 0 ? maxForwardDuration + 60 : 0;
       const kickDuration = animConfig.captureDurationMs;
 
-      const captureTimer = setTimeout(() => {
+      const seq = (tokenAnimSeqRef.current.get(key) || 0) + 1;
+      tokenAnimSeqRef.current.set(key, seq);
+
+      safeTimeout(() => {
+        if (tokenAnimSeqRef.current.get(key) !== seq) return;
         sounds.playCapture();
 
         // Brief impact shudder at destination square
@@ -670,17 +737,18 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
           ...prev,
           [key]: {
             ...prev[key],
-            arcOffsetPx: -3,
-            scale: 0.9,
+            arcOffsetPx: -4,
+            scale: 0.94,
             isAnimating: true,
             hopDurationMs: kickDuration,
           },
         }));
 
-        const flyBackTimer = setTimeout(() => {
+        safeTimeout(() => {
+          if (tokenAnimSeqRef.current.get(key) !== seq) return;
           const baseCoord = getTokenBoardPercent(color, token.id, -1, 0, 1);
 
-          // Fly back arc towards base
+          // Fly back arc towards base pit
           setVisualTokens((prev) => ({
             ...prev,
             [key]: {
@@ -688,13 +756,14 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
               stepCount: -1,
               left: baseCoord.left,
               top: baseCoord.top,
-              arcOffsetPx: -10,
-              scale: 1.15,
+              arcOffsetPx: -8,
+              scale: 1.1,
               isAnimating: true,
             },
           }));
 
-          const settleTimer = setTimeout(() => {
+          safeTimeout(() => {
+            if (tokenAnimSeqRef.current.get(key) !== seq) return;
             setVisualTokens((prev) => ({
               ...prev,
               [key]: {
@@ -704,18 +773,12 @@ export const LudoBoard: React.FC<LudoBoardProps> = ({
                 isAnimating: false,
               },
             }));
-            checkAllComplete();
-          }, kickDuration * 0.7);
-
-          activeTimersRef.current.push(settleTimer);
-        }, 80);
-
-        activeTimersRef.current.push(flyBackTimer);
+            checkTokenDone(key);
+          }, Math.round(kickDuration * 0.7));
+        }, 70);
       }, kickbackDelay);
-
-      activeTimersRef.current.push(captureTimer);
     });
-  }, [tokens, activeColors, animConfig, onAnimationStateChange]);
+  }, [tokens, activeColors, animConfig, onAnimationStateChange, safeTimeout]);
 
   // Destination preview calculation when hovering a movable token
   const previewTokenId =

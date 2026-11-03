@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { PlayerColor, COLOR_HEX } from '../lib/ludoEngine.js';
 import {
   DICE_FACE_ANGLES,
@@ -6,6 +6,7 @@ import {
   calculateRollAngles,
   DiceRotation,
 } from '../lib/diceOrientation.js';
+import { isReducedMotionPreferred } from '../lib/tokenAnimation.js';
 
 interface Dice3DProps {
   value: number | null;
@@ -26,95 +27,145 @@ export const Dice3D: React.FC<Dice3DProps> = ({
 }) => {
   const colorTheme = COLOR_HEX[color] || COLOR_HEX.red;
 
-  // Pixel dimensions based on size
+  // Responsive cube & pip geometry
   const dimensionConfig = {
-    sm: { cubeSize: 44, half: 22, pipSize: 6, p1PipSize: 10, perspective: 450 },
-    md: { cubeSize: 58, half: 29, pipSize: 8, p1PipSize: 14, perspective: 600 },
-    lg: { cubeSize: 72, half: 36, pipSize: 10, p1PipSize: 18, perspective: 750 },
+    sm: { cubeSize: 44, half: 22, pipSize: 7, perspective: 450 },
+    md: { cubeSize: 58, half: 29, pipSize: 9, perspective: 600 },
+    lg: { cubeSize: 72, half: 36, pipSize: 11, perspective: 750 },
   }[size];
 
-  const { cubeSize, half, pipSize, p1PipSize, perspective } = dimensionConfig;
+  const { cubeSize, half, pipSize, perspective } = dimensionConfig;
 
-  // Stored accumulated rotation angles to ensure forward tumbling
+  // DOM ref to the 3D cube element for direct GPU transform manipulation during rolling
+  const cubeRef = useRef<HTMLDivElement | null>(null);
+
+  // Stored accumulated rotation angles to ensure forward tumbling without reversals
   const rotationRef = useRef<DiceRotation>({ rotateX: -14, rotateY: 18, rotateZ: 0 });
   const [rotation, setRotation] = useState<DiceRotation>(rotationRef.current);
   const [isLanding, setIsLanding] = useState(false);
-  const prevIsRollingRef = useRef(isRolling);
-  const tumbleIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Manage tumbling and landing transitions
+  // Animation frame and timer tracking
+  const rafIdRef = useRef<number | null>(null);
+  const landingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const settleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTimestampRef = useRef<number>(0);
+  const prevIsRollingRef = useRef<boolean>(isRolling);
+
+  // Stop active rAF loop
+  const stopTumblingRaf = useCallback(() => {
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+      rafIdRef.current = null;
+    }
+  }, []);
+
+  // Cleanup all timers and animation frames on unmount
   useEffect(() => {
-    // Phase 1: Rolling Starts -> rapid 3D tumbling sequence
+    return () => {
+      stopTumblingRaf();
+      if (landingTimeoutRef.current) clearTimeout(landingTimeoutRef.current);
+      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+    };
+  }, [stopTumblingRaf]);
+
+  // Rolling lifecycle management
+  useEffect(() => {
+    const isReduced = isReducedMotionPreferred();
+
+    // PHASE 1: Rolling starts -> Continuous smooth multi-axis tumbling
     if (isRolling) {
       setIsLanding(false);
-      let step = 0;
-      if (tumbleIntervalRef.current) clearInterval(tumbleIntervalRef.current);
+      if (landingTimeoutRef.current) clearTimeout(landingTimeoutRef.current);
+      if (settleTimeoutRef.current) clearTimeout(settleTimeoutRef.current);
+      stopTumblingRaf();
 
-      tumbleIntervalRef.current = setInterval(() => {
-        step += 1;
-        // Generate dynamic continuous multi-axis tumbling
-        rotationRef.current = {
-          rotateX: rotationRef.current.rotateX + 90 + Math.sin(step) * 45,
-          rotateY: rotationRef.current.rotateY + 120 + Math.cos(step) * 45,
-          rotateZ: rotationRef.current.rotateZ + 45,
+      if (!isReduced) {
+        lastTimestampRef.current = performance.now();
+
+        const tumbleLoop = (now: number) => {
+          const dt = Math.min((now - lastTimestampRef.current) / 1000, 0.05);
+          lastTimestampRef.current = now;
+
+          // Multi-axis continuous rotation (X and Y tumbling with subtle Z wobble)
+          rotationRef.current.rotateX += dt * 680;
+          rotationRef.current.rotateY += dt * 820;
+          rotationRef.current.rotateZ = Math.sin(now * 0.006) * 18;
+
+          if (cubeRef.current) {
+            cubeRef.current.style.transition = 'none';
+            cubeRef.current.style.transform = `rotateX(${rotationRef.current.rotateX}deg) rotateY(${rotationRef.current.rotateY}deg) rotateZ(${rotationRef.current.rotateZ}deg)`;
+          }
+
+          rafIdRef.current = requestAnimationFrame(tumbleLoop);
         };
-        setRotation({ ...rotationRef.current });
-      }, 70);
 
-      prevIsRollingRef.current = true;
-      return () => {
-        if (tumbleIntervalRef.current) clearInterval(tumbleIntervalRef.current);
-      };
-    }
-
-    // Phase 2: Rolling Ends -> Decelerate and settle squarely on authoritative value
-    if (prevIsRollingRef.current && !isRolling) {
-      if (tumbleIntervalRef.current) {
-        clearInterval(tumbleIntervalRef.current);
-        tumbleIntervalRef.current = null;
+        rafIdRef.current = requestAnimationFrame(tumbleLoop);
       }
 
+      prevIsRollingRef.current = true;
+      return;
+    }
+
+    // PHASE 2: Rolling ends -> Decelerate smoothly into the authoritative face
+    if (prevIsRollingRef.current && !isRolling) {
+      stopTumblingRaf();
+
       const targetVal = value !== null && value >= 1 && value <= 6 ? value : 1;
-      const targetAngles = calculateRollAngles(targetVal, rotationRef.current, 2);
+      const targetAngles = calculateRollAngles(
+        targetVal,
+        rotationRef.current,
+        isReduced ? 0 : 2
+      );
       rotationRef.current = targetAngles;
       setRotation(targetAngles);
 
-      // Trigger landing bounce
-      setIsLanding(true);
-      const timer = setTimeout(() => {
-        setIsLanding(false);
-      }, 350);
+      if (cubeRef.current) {
+        if (isReduced) {
+          cubeRef.current.style.transition = 'transform 120ms ease-out';
+          cubeRef.current.style.transform = `rotateX(${targetAngles.rotateX}deg) rotateY(${targetAngles.rotateY}deg) rotateZ(0deg)`;
+        } else {
+          // Gradual deceleration curve over 850ms settling onto the authoritative face
+          cubeRef.current.style.transition = 'transform 850ms cubic-bezier(0.16, 1, 0.3, 1)';
+          cubeRef.current.style.transform = `rotateX(${targetAngles.rotateX}deg) rotateY(${targetAngles.rotateY}deg) rotateZ(0deg)`;
+
+          // Trigger subtle landing bounce as the rotation settles
+          landingTimeoutRef.current = setTimeout(() => {
+            setIsLanding(true);
+            settleTimeoutRef.current = setTimeout(() => {
+              setIsLanding(false);
+            }, 200);
+          }, 780);
+        }
+      }
 
       prevIsRollingRef.current = false;
-      return () => clearTimeout(timer);
+      return;
     }
 
-    // Phase 3: External authoritative update when not actively rolling (e.g., initial state or online sync)
+    // PHASE 3: External authoritative state sync (when not rolling)
     if (!isRolling && value !== null && value >= 1 && value <= 6) {
       const baseAngles = DICE_FACE_ANGLES[value];
-      // If angles differ significantly, align to face
-      const diffX = Math.abs((rotationRef.current.rotateX % 360) - baseAngles.rotateX);
-      const diffY = Math.abs((rotationRef.current.rotateY % 360) - baseAngles.rotateY);
-      if (diffX > 5 || diffY > 5) {
+      const diffX = Math.abs((((rotationRef.current.rotateX % 360) + 360) % 360) - (((baseAngles.rotateX % 360) + 360) % 360));
+      const diffY = Math.abs((((rotationRef.current.rotateY % 360) + 360) % 360) - (((baseAngles.rotateY % 360) + 360) % 360));
+
+      if (diffX > 2 || diffY > 2) {
         const next = calculateRollAngles(value, rotationRef.current, 0);
         rotationRef.current = next;
         setRotation(next);
+
+        if (cubeRef.current) {
+          cubeRef.current.style.transition = isReduced ? 'transform 100ms ease-out' : 'transform 450ms cubic-bezier(0.2, 1, 0.3, 1)';
+          cubeRef.current.style.transform = `rotateX(${next.rotateX}deg) rotateY(${next.rotateY}deg) rotateZ(0deg)`;
+        }
       }
     }
+
     prevIsRollingRef.current = isRolling;
-  }, [isRolling, value]);
+  }, [isRolling, value, stopTumblingRaf]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (tumbleIntervalRef.current) clearInterval(tumbleIntervalRef.current);
-    };
-  }, []);
-
-  // Render individual face pips with realistic recessed styling
+  // Consistent pip styling across all 6 faces
   const renderFacePips = (faceNum: number) => {
     const coords = DICE_PIP_POSITIONS[faceNum] || [];
-    const isSinglePip = faceNum === 1;
 
     return (
       <div className="grid grid-cols-3 grid-rows-3 w-full h-full p-1.5 sm:p-2 pointer-events-none select-none">
@@ -127,21 +178,17 @@ export const Dice3D: React.FC<Dice3DProps> = ({
             return <div key={idx} />;
           }
 
-          const currentPipPx = isSinglePip ? p1PipSize : pipSize;
-          const isRed = isSinglePip || faceNum === 6;
-
           return (
             <div key={idx} className="flex items-center justify-center">
               <div
                 style={{
-                  width: `${currentPipPx}px`,
-                  height: `${currentPipPx}px`,
-                  backgroundColor: isRed ? '#e11d48' : '#0f172a',
-                  boxShadow: isRed
-                    ? 'inset 0 1.5px 2px rgba(0,0,0,0.6), 0 0 4px rgba(225,29,72,0.5)'
-                    : 'inset 0 1.5px 2px rgba(0,0,0,0.8), 0 0.5px 1px rgba(255,255,255,0.7)',
+                  width: `${pipSize}px`,
+                  height: `${pipSize}px`,
+                  backgroundColor: '#0f172a',
+                  boxShadow:
+                    'inset 0 1.5px 2px rgba(0,0,0,0.8), 0 0.5px 1px rgba(255,255,255,0.7)',
                 }}
-                className="rounded-full transition-transform"
+                className="rounded-full"
               />
             </div>
           );
@@ -150,7 +197,7 @@ export const Dice3D: React.FC<Dice3DProps> = ({
     );
   };
 
-  // Face CSS definition helper
+  // Face CSS definition helper for standard cube geometry
   const faceStyle = (transform: string): React.CSSProperties => ({
     position: 'absolute',
     width: `${cubeSize}px`,
@@ -193,18 +240,19 @@ export const Dice3D: React.FC<Dice3DProps> = ({
           width: `${cubeSize * 0.9}px`,
           height: '10px',
           borderRadius: '50%',
-          background: 'radial-gradient(ellipse at center, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.2) 60%, transparent 80%)',
+          background:
+            'radial-gradient(ellipse at center, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.2) 60%, transparent 80%)',
           transform: isRolling
             ? 'scale(0.7) translateY(4px)'
             : isLanding
-            ? 'scale(1.2)'
+            ? 'scale(1.18)'
             : 'scale(1.0)',
-          opacity: isRolling ? 0.35 : 0.85,
-          filter: isRolling ? 'blur(3px)' : 'blur(1px)',
+          opacity: isRolling ? 0.35 : isLanding ? 0.85 : 0.7,
+          filter: isRolling ? 'blur(3px)' : 'blur(1.2px)',
         }}
       />
 
-      {/* 3D Dice Interactive Cube Container */}
+      {/* 3D Dice Interactive Cube Container with vertical lift and landing bounce */}
       <div
         role="button"
         tabIndex={canRoll ? 0 : -1}
@@ -225,25 +273,23 @@ export const Dice3D: React.FC<Dice3DProps> = ({
           width: `${cubeSize}px`,
           height: `${cubeSize}px`,
           transformStyle: 'preserve-3d',
-          transform: `translate3d(0, ${isRolling ? -16 : isLanding ? 3 : 0}px, 0)`,
+          transform: `translate3d(0, ${isRolling ? -16 : isLanding ? 2.5 : 0}px, 0)`,
           transition: isRolling
-            ? 'transform 100ms ease-out'
+            ? 'transform 150ms ease-out'
             : isLanding
-            ? 'transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1)'
+            ? 'transform 180ms cubic-bezier(0.34, 1.56, 0.64, 1)'
             : 'transform 300ms ease-out',
         }}
       >
         {/* The 6-Faced CSS 3D Cube */}
         <div
+          ref={cubeRef}
           style={{
             width: '100%',
             height: '100%',
             position: 'absolute',
             transformStyle: 'preserve-3d',
             transform: `rotateX(${rotation.rotateX}deg) rotateY(${rotation.rotateY}deg) rotateZ(${rotation.rotateZ}deg)`,
-            transition: isRolling
-              ? 'transform 70ms linear'
-              : 'transform 650ms cubic-bezier(0.16, 1, 0.3, 1)',
             willChange: 'transform',
           }}
         >
